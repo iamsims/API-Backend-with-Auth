@@ -1,81 +1,117 @@
-from fastapi import FastAPI, Body, Depends 
-from app.model import PostSchema, UserSchema, UserLoginSchema
-from app.auth.jwt_handler import signJWT
-from app.auth.jwt_bearer import jwtBearer
+from datetime import  timedelta
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from app.auth.jwt_handler import create_access_token,  decodeJWT
+from app.model import User, UserInDB, UserLoginSchema, Token, TokenData
+from app.auth.password_handler import get_password_hash, verify_password
 
+from jose import JWTError
+
+
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+fake_users_db = {
+    "johndoe": {
+        "username": "johndoe",
+        "email": "johndoe@example.com",
+        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
+        "disabled": False,
+    }, 
+    "string": {
+    "username": "string",
+    "email": "string",
+    "hashed_password": "$2b$12$/G6LmCloVLc7Jh82TnGyx.noPvWsHiq6SHTNvDkh.CKAtDwi2DpqW",
+    "disabled": False
+  }
+}
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 app = FastAPI()
 
-posts = [ 
-    {
-        "id" : 1,
-        "title" : "My first post",
-        "content" : "This is my first post."
-    }, 
-    {
-        "id" : 2,
-        "title" : "My second post",
-        "content" : "This is my second post."
-        
-    }, 
-    {
-        "id" : 3,
-        "title" : "My third post",
-        "content" : "This is my third post."
 
+def get_user(db, username: str):
+    if username in db:
+        user_dict = db[username]
+        return UserInDB(**user_dict)
+
+
+def authenticate_user(fake_db, username: str, password: str):
+    user = get_user(fake_db, username)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = decodeJWT(token=token)
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = get_user(fake_users_db, username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+async def get_current_active_user(current_user: User = Depends(get_current_user)):
+    if current_user.disabled:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+
+@app.post("/signup", response_model=Token)
+async def signup(user: UserLoginSchema):
+    if get_user(fake_users_db, username=user.username):
+        raise HTTPException(status_code=400, detail="Username already registered")
+
+    # TODO validate user email address and password
+    hashed_password = get_password_hash(user.password)
+    fake_users_db[user.username] = {
+        "username": user.username,
+        "email": user.email,
+        "hashed_password": hashed_password,
+        "disabled": True,
     }
-]
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
-users = []
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/", tags=["test"])
-async def root():
-    return {"message" : "Hello World"}
+@app.get("/users/me/", response_model=User)
+async def read_users_me(current_user: User = Depends(get_current_active_user)):
+    return current_user
 
 
-@app.get("/posts", tags=["posts"])
-async def get_posts():
-    return {"posts" : posts}
-
-
-@app.get("/posts/{post_id}", tags=["posts"])
-async def get_post(post_id : int):
-    if post_id > len(posts):
-        return {
-            "error": "Post not found"
-        }
-    for post in posts:
-        if post["id"] == post_id:
-            return {"post" : post}
-    return {"error" : "Post not found"}
-
-
-@app.post("/posts", tags=["posts"], dependencies=[Depends(jwtBearer())])
-async def add_post(post : PostSchema):
-    posts.append(post)
-    return {"info" : "Post added successfully"}
-
-
-@app.post("/user/signup", tags=["user"])
-async def signup(user : UserSchema = Body(default=None)):
-    users.append(user)
-    return signJWT(user.email)
-
-
-@app.post("/user/login", tags=["user"])
-async def login(user : UserLoginSchema = Body(default=None)):
-    for u in users:
-        if u.email == user.email and u.password == user.password:
-            return signJWT(user.email)
-    return {"error" : "User not found"}
-
-
-
-
-
-
-
-
-
+@app.get("/users/me/items/")
+async def read_own_items(current_user: User = Depends(get_current_active_user)):
+    return [{"item_id": "Foo", "owner": current_user.username}]

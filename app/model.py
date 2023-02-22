@@ -1,42 +1,25 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel
+from typing import Union
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Union[str, None] = None
+
+class User(BaseModel):
+    username: str
+    email: Union[str, None] = None
+    disabled: Union[bool, None] = None
 
 
-class PostSchema(BaseModel):
-    id : int = Field(default=None)
-    title : str = Field(default=None)
-    content : str = Field(default=None)
-    class Config:
-        schema_extra = {
-            "post_demo" : {
-                "title" : "demo post",
-                "content" : "This is my demo post."
-            }
-        }
-
-
-class UserSchema(BaseModel):
-    fullname : str = Field(default=None)
-    email : EmailStr = Field(default=None)
-    password : str = Field(default=None)
-    class Config:
-        schema_extra = {
-            "user_demo" : {
-                "fullname" : "John Doe",
-                "email" : "", 
-                "password" : ""
-            }
-        }
-
-
-class UserLoginSchema(BaseModel):
-    email : EmailStr = Field(default=None)
-    password : str = Field(default=None)
-    class Config:
-        schema_extra = {
-            "user_demo" : {
-                "email" : "", 
-                "password" : ""
-            }
-        }
-
+class UserInDB(User):
+    hashed_password: str
     
+class UserLoginSchema(User):
+    username : str
+    password: str
+    email: Union[str, None] = None
+    disabled: Union[bool, None] = None
+
