@@ -7,11 +7,6 @@ from pydantic import BaseModel, EmailStr, Field
 UserIdentifier = str
 
 
-class UserLoginWithOTP(BaseModel):
-    email: EmailStr
-    otp_code: str
-
-
 class User(BaseModel):
     id: str | PydanticObjectId
     sub: UserIdentifier
