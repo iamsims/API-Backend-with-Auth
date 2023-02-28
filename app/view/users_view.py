@@ -1,3 +1,6 @@
+from fastapi import APIRouter
+
+
 from typing import Union
 from fastapi import Depends, FastAPI
 import httpx
@@ -14,14 +17,18 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
 
-from auth.jwt_handler import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION
-from auth.jwt_handler import create_access_token, verify_jwt, decodeJWT, create_refresh_token
+from app.auth.jwt_handler import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION
+from app.auth.jwt_handler import create_access_token, verify_jwt, decodeJWT, create_refresh_token
 from datetime import timedelta
-from auth.password_handler import get_password_hash, verify_password
+from app.auth.password_handler import get_password_hash, verify_password
 
-from controllers.db import add_user, get_all_users, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
+from app.controllers.db import add_user, get_all_users, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
 
-from models.users import UserinDB, UserLoginSchema
+from app.models.users import UserinDB, UserLoginSchema
+
+
+
+router = APIRouter()
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -40,14 +47,6 @@ if GITHUB_CLIENT_ID is None or GITHUB_CLIENT_SECRET is None:
     raise BaseException('Missing env variables')
 
 
-SECRET_KEY = config('SECRET_KEY') or None
-if SECRET_KEY is None:
-    raise 'Missing SECRET_KEY'
-
-app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-
-
 # Set up oauth
 config_data = {'GOOGLE_CLIENT_ID': GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_SECRET': GOOGLE_CLIENT_SECRET}
 starlette_config = Config(environ=config_data)
@@ -58,12 +57,12 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
-@app.get('/')
+@router.get('/')
 def public():
     return {'result': 'This is a public endpoint.'}
 
 
-@app.route('/login/{provider}')
+@router.route('/login/{provider}')
 async def login(request: Request):
     provider = request.path_params['provider']
     match provider:
@@ -115,10 +114,9 @@ async def get_user_info_github(access_token):
     except:
         raise CREDENTIALS_EXCEPTION
 
-@app.post("/signup")
+@router.post("/signup")
 async def signup(user: UserLoginSchema):
     hashed_password = get_password_hash(user.password)
-    print(hashed_password, user.password)
     data = UserinDB(**{"identifier": user.username, "provider": "password", "hashed_pw": hashed_password, "provider_id": user.username})
 
     user_exists = await is_user_in_db(data)
@@ -128,12 +126,12 @@ async def signup(user: UserLoginSchema):
     await add_user(data)
 
     access_token = create_access_token(
-        data={"identifier": data.identifier, "provider": data.provider},
+        data=vars(data),
     )
     return JSONResponse({"result": True, "access_token": access_token, "token_type": "bearer"})
 
 
-@app.post("/token")
+@router.post("/token")
 async def login_for_access_token(user: UserLoginSchema):
 
     data = UserinDB(**{"identifier": user.username, "provider": "password", "provider_id": user.username})
@@ -156,7 +154,7 @@ async def login_for_access_token(user: UserLoginSchema):
 
 
 
-@app.route('/token/{provider}')
+@router.route('/token/{provider}')
 async def token(request: Request):
     provider = request.path_params['provider']
     match provider:
@@ -226,7 +224,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     raise CREDENTIALS_EXCEPTION
    
   
-@app.get('/logout')
+@router.get('/logout')
 async def logout(token: str = Depends(get_current_user_token)):
     try :
         await add_blacklist_token(token)
@@ -236,14 +234,14 @@ async def logout(token: str = Depends(get_current_user_token)):
     
     return {'result': True}
 
-@app.get('/protected')
+@router.get('/protected')
 async def protected(identifier: str = Depends(get_current_user)):
     return {'identifier': identifier}
 
 
 
 # Implementation of refresh token
-# @app.post('/refresh')
+# @router.post('/refresh')
 # async def refresh(request: Request):
 #     try:
 #         form = await request.json()
@@ -275,11 +273,12 @@ async def protected(identifier: str = Depends(get_current_user)):
 #         await add_user(data)
 
 
-# @app.get("/testall")
+# @router.get("/testall")
 # async def testall():
 #     return await get_all_users()
 
-# @app.get("/test")
+# @router.get("/test")
 # async def test():
 #     data = UserinDB(identifier="tassu", provider="password")
 #     await add_if_not_in_db(data)
+

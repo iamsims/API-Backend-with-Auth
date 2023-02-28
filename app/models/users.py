@@ -8,15 +8,6 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Union[str, None] = None
 
-# class User(BaseModel):
-#     username: str
-#     email: Union[str, None] = None
-#     disabled: Union[bool, None] = None
-
-
-# class UserInDB(User):
-#     hashed_password: str
-    
 class UserinDB(BaseModel):
     identifier : str
     hashed_pw: Union[str, None] = None

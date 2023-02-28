@@ -30,18 +30,3 @@ class Blacklist(Base):
 
     def __repr__(self) -> str:
         return f"Blacklist token={self.token!r})"
-
-
-# FAKE_BLACKLIST = []
-
-# def add_blacklist_token(token):
-#     FAKE_BLACKLIST.append(token)
-#     return True
-
-
-# def is_token_blacklisted(token):
-#     if token in FAKE_BLACKLIST:
-#         return True
-#     return False
-
-
