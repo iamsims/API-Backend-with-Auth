@@ -28,3 +28,4 @@ archive.zip
 
 # Virtual Env
 fastapienv
+.env
