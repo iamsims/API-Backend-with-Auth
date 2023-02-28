@@ -238,37 +238,41 @@ async def logout(token: str = Depends(get_current_user_token)):
 
 @router.get('/protected/')
 async def protected(identifier: str = Depends(get_current_user)):
-
+    print(identifier)
     return {'identifier': identifier}
 
 
 # if authenticated, requests forwarded to the kuber server
-@router.route('/kuber/{endpoint:path}', methods=["GET", "POST"])
+@router.get('/kuber/{endpoint:path}')
 async def forward(request: Request, identifier: str = Depends(get_current_user)):
     try:
         endpoint = request.path_params['endpoint']
-        if request.method == "GET":
-            print(f"Forwarding get request to {KUBER_SERVER}/{endpoint}")
-            # async with httpx.AsyncClient() as client:
-            #     response = await client.get(f"http://localhost:8000/{endpoint}", headers=request.headers)
-            #     return JSONResponse(content=response.json(), status_code=response.status_code)
-            return JSONResponse(content={"result": True}, status_code=200)
+        print(f"Forwarding get request to {KUBER_SERVER}/{endpoint}")
+        # async with httpx.AsyncClient() as client:
+        #     response = await client.get(f"http://localhost:8000/{endpoint}", headers=request.headers)
+        #     return JSONResponse(content=response.json(), status_code=response.status_code)
+        print(identifier)
+        return JSONResponse(content={"result": True, "identifier": identifier}, status_code=200 )
+        
+    except:
+        print("Could not forward request")
+        raise KUBER_EXCEPTION
+    
 
-        elif request.method == "POST":
-            print(f"Forwarding post request to {KUBER_SERVER}/{endpoint}")
-            # async with httpx.AsyncClient() as client:
-                # response = await client.post(f"http://localhost:8000/{endpoint}", headers=request.headers, data=request.body)
-                # return JSONResponse(content=response.json(), status_code=response.status_code)
-            return JSONResponse(content={"result": True}, status_code=200)
+@router.post('/kuber/{endpoint:path}')
+async def forward(request: Request, identifier: str = Depends(get_current_user)):
+    try:
+        endpoint = request.path_params['endpoint']
+        print(f"Forwarding post request to {KUBER_SERVER}/{endpoint}")
+        # async with httpx.AsyncClient() as client:
+            # response = await client.post(f"http://localhost:8000/{endpoint}", headers=request.headers, data=request.body)
+            # return JSONResponse(content=response.json(), status_code=response.status_code)
+        return JSONResponse(content={"result": True}, status_code=200)
 
     except:
         print("Could not forward request")
         raise KUBER_EXCEPTION
-
-
-
-
-
+  
 
 # Implementation of refresh token
 # @router.post('/refresh')
