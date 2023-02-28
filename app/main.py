@@ -14,16 +14,14 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
 
-from app.auth.jwt_handler import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION
-from app.auth.jwt_handler import create_access_token, verify_jwt, decodeJWT, create_refresh_token
+from auth.jwt_handler import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION
+from auth.jwt_handler import create_access_token, verify_jwt, decodeJWT, create_refresh_token
 from datetime import timedelta
-from app.auth.password_handler import get_password_hash, verify_password
+from auth.password_handler import get_password_hash, verify_password
 
-from db import add_user, get_all_users, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
+from controllers.db import add_user, get_all_users, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
 
-from app.models.users import UserinDB, UserLoginSchema
-
-
+from models.users import UserinDB, UserLoginSchema
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
