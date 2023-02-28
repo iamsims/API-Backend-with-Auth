@@ -1,21 +1,16 @@
-import os
-
 from fastapi import FastAPI
-from dotenv import load_dotenv
-from app import init_app
-from app.settings import configs
+from app.view.users_view import router as users_router
 
-api_settings = configs.api_settings
+from starlette.middleware.sessions import SessionMiddleware
+from decouple import config
 
-load_dotenv(dotenv_path=os.getenv("DOTENV_PATH", '.env.example'))
+SECRET_KEY = config('SECRET_KEY') or None
+if SECRET_KEY is None:
+    raise 'Missing SECRET_KEY'
 
-app = FastAPI(
-    title=api_settings.title,
-    description=api_settings.description,
-    version=api_settings.version,
-    # root_path='/api/v1',
-    # docs_url="/api/v1/openapi.json",
-    redoc_url=None
-)
+app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
-init_app(app)
+
+app.include_router(users_router)
+

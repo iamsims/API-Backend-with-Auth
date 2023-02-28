@@ -7,10 +7,6 @@ __pycache__
 htmlcov
 dist
 site
-<<<<<<< HEAD
-=======
-.env
->>>>>>> main
 .coverage
 coverage.xml
 .netlify
@@ -26,12 +22,5 @@ archive.zip
 
 # vim temporary files
 *~
-<<<<<<< HEAD
 .*.sw?
-=======
-.*.sw?
-
-
-# Virtual Env
 fastapienv
->>>>>>> main
