@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.view.users_view import router as users_router
+from app.api.users_api import router as users_router
 
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config

@@ -7,8 +7,8 @@ import time
 from fastapi import HTTPException, status
 
 
-JWT_SECRET = config('secret')
-JWT_ALGORITHM = config('algorithm')
+JWT_SECRET = config('JWT_SECRET')
+JWT_ALGORITHM = config('JWT_ALGORITHM')
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30
 
@@ -27,6 +27,11 @@ ALREADY_REGISTERED_EXCEPTION = HTTPException(
 DATABASE_EXCEPTION = HTTPException(
     status_code=500,
     detail="Database error"
+)
+
+KUBER_EXCEPTION = HTTPException(
+    status_code=500,
+    detail="Kuber error"
 )
 
 INCORRENT_USERNAME_EXCEPTION = HTTPException(

@@ -1,8 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-
-from typing import Union
-from fastapi import Depends, FastAPI
 import httpx
 from jose import JWTError
 
@@ -12,17 +9,16 @@ from starlette.responses import JSONResponse
 from fastapi import Request
 from starlette.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuthError
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 
-from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
 
-from app.auth.jwt_handler import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION
-from app.auth.jwt_handler import create_access_token, verify_jwt, decodeJWT, create_refresh_token
+from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION
+from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_token
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
 
-from app.controllers.db import add_user, get_all_users, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
+from app.controllers.db import add_user, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
 
 from app.models.users import UserinDB, UserLoginSchema
 
@@ -38,13 +34,18 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID') or None
 GOOGLE_CLIENT_SECRET =config('GOOGLE_CLIENT_SECRET') or None
 if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
-    raise BaseException('Missing env variables')
+    raise BaseException('Missing env variables for google auth')
+
+
+KUBER_SERVER = config('KUBER_SERVER') or None
+if KUBER_SERVER is None:
+    raise BaseException('Missing env variables for kuber server')
 
 # OAuth settings
 GITHUB_CLIENT_ID = config('GITHUB_CLIENT_ID') or None
 GITHUB_CLIENT_SECRET =config('GITHUB_CLIENT_SECRET') or None
 if GITHUB_CLIENT_ID is None or GITHUB_CLIENT_SECRET is None:
-    raise BaseException('Missing env variables')
+    raise BaseException('Missing env variables for github auth')
 
 
 # Set up oauth
@@ -83,7 +84,7 @@ async def get_google_token(request: Request):
         raise CREDENTIALS_EXCEPTION
     return access_token
 
-async def get_github_token(code : str):
+async def get_github_token(code : str, params : dict):
     try:
         params = {
             "client_id": GITHUB_CLIENT_ID,
@@ -234,9 +235,38 @@ async def logout(token: str = Depends(get_current_user_token)):
     
     return {'result': True}
 
-@router.get('/protected')
+
+@router.get('/protected/')
 async def protected(identifier: str = Depends(get_current_user)):
+
     return {'identifier': identifier}
+
+
+# if authenticated, requests forwarded to the kuber server
+@router.route('/kuber/{endpoint:path}', methods=["GET", "POST"])
+async def forward(request: Request, identifier: str = Depends(get_current_user)):
+    try:
+        endpoint = request.path_params['endpoint']
+        if request.method == "GET":
+            print(f"Forwarding get request to {KUBER_SERVER}/{endpoint}")
+            # async with httpx.AsyncClient() as client:
+            #     response = await client.get(f"http://localhost:8000/{endpoint}", headers=request.headers)
+            #     return JSONResponse(content=response.json(), status_code=response.status_code)
+            return JSONResponse(content={"result": True}, status_code=200)
+
+        elif request.method == "POST":
+            print(f"Forwarding post request to {KUBER_SERVER}/{endpoint}")
+            # async with httpx.AsyncClient() as client:
+                # response = await client.post(f"http://localhost:8000/{endpoint}", headers=request.headers, data=request.body)
+                # return JSONResponse(content=response.json(), status_code=response.status_code)
+            return JSONResponse(content={"result": True}, status_code=200)
+
+    except:
+        print("Could not forward request")
+        raise KUBER_EXCEPTION
+
+
+
 
 
 
