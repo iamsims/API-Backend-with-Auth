@@ -84,18 +84,18 @@ async def get_google_token(request: Request):
         raise CREDENTIALS_EXCEPTION
     return access_token
 
-async def get_github_token(code : str, params : dict):
+async def get_github_token(code : str):
     try:
         params = {
             "client_id": GITHUB_CLIENT_ID,
             "client_secret": GITHUB_CLIENT_SECRET,
             "code": code
         }
+
         headers = { "Accept": "application/json" }
         async with httpx.AsyncClient() as client:
             r = await client.post(url = 'https://github.com/login/oauth/access_token', params=params, headers=headers)
         response_json = r.json()
-        # print(response_json)
         access_token = response_json['access_token']
 
     except:
