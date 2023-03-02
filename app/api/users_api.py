@@ -1,8 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, status 
 
-
-from typing import Union
-from fastapi import Depends, FastAPI
 import httpx
 from jose import JWTError
 
@@ -14,37 +11,36 @@ from starlette.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuthError
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
-from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
 
-from app.auth.jwt_handler import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION
-from app.auth.jwt_handler import create_access_token, verify_jwt, decodeJWT, create_refresh_token
+from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION
+from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_token
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
 
-from app.controllers.db import add_user, get_all_users, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
+from app.controllers.db import add_user, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
 
 from app.models.users import UserinDB, UserLoginSchema
 
-
-
-router = APIRouter()
-
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
+from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 
 # OAuth settings
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID') or None
 GOOGLE_CLIENT_SECRET =config('GOOGLE_CLIENT_SECRET') or None
 if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
-    raise BaseException('Missing env variables')
+    raise BaseException('Missing env variables for google auth')
+
+
+KUBER_SERVER = config('KUBER_SERVER') or None
+if KUBER_SERVER is None:
+    raise BaseException('Missing env variables for kuber server')
 
 # OAuth settings
 GITHUB_CLIENT_ID = config('GITHUB_CLIENT_ID') or None
 GITHUB_CLIENT_SECRET =config('GITHUB_CLIENT_SECRET') or None
 if GITHUB_CLIENT_ID is None or GITHUB_CLIENT_SECRET is None:
-    raise BaseException('Missing env variables')
+    raise BaseException('Missing env variables for github auth')
 
 
 # Set up oauth
@@ -57,12 +53,16 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
-@router.get('/')
-def public():
-    return {'result': 'This is a public endpoint.'}
 
 
-@router.route('/login/{provider}')
+
+router = APIRouter()
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+@router.get('/login/{provider}')
 async def login(request: Request):
     provider = request.path_params['provider']
     match provider:
@@ -90,11 +90,11 @@ async def get_github_token(code : str):
             "client_secret": GITHUB_CLIENT_SECRET,
             "code": code
         }
+
         headers = { "Accept": "application/json" }
         async with httpx.AsyncClient() as client:
             r = await client.post(url = 'https://github.com/login/oauth/access_token', params=params, headers=headers)
         response_json = r.json()
-        # print(response_json)
         access_token = response_json['access_token']
 
     except:
@@ -115,7 +115,7 @@ async def get_user_info_github(access_token):
         raise CREDENTIALS_EXCEPTION
 
 @router.post("/signup")
-async def signup(user: UserLoginSchema):
+async def signup(user: UserLoginSchema, status_code=status.HTTP_201_CREATED):
     hashed_password = get_password_hash(user.password)
     data = UserinDB(**{"identifier": user.username, "provider": "password", "hashed_pw": hashed_password, "provider_id": user.username})
 
@@ -132,9 +132,9 @@ async def signup(user: UserLoginSchema):
 
 
 @router.post("/token")
-async def login_for_access_token(user: UserLoginSchema):
+async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends(), status_code=status.HTTP_200_OK):
 
-    data = UserinDB(**{"identifier": user.username, "provider": "password", "provider_id": user.username})
+    data = UserinDB(**{"identifier": form.username, "provider": "password", "provider_id": form.username})
     
     user_exists = await is_user_in_db(data)
 
@@ -143,7 +143,7 @@ async def login_for_access_token(user: UserLoginSchema):
     
 
     user_in_db = await get_user(data)
-    if not verify_password(user.password, user_in_db.hashed_pw):
+    if not verify_password(form.password, user_in_db.hashed_pw):
         raise INCORRENT_PASSWORD_EXCEPTION
     
     access_token = create_access_token(
@@ -154,7 +154,7 @@ async def login_for_access_token(user: UserLoginSchema):
 
 
 
-@router.route('/token/{provider}')
+@router.get('/token/{provider}')
 async def token(request: Request):
     provider = request.path_params['provider']
     match provider:
@@ -189,13 +189,15 @@ async def token(request: Request):
 
     local_token = create_access_token(data=data)
     refresh_token = create_refresh_token(data = data)
-    return JSONResponse({'result': True, 'access_token': local_token, "refresh_token": refresh_token})
+    return JSONResponse({'result': True, 'access_token': local_token, "token_type": "bearer"})
 
 
 
 async def get_current_user_token(token: str = Depends(oauth2_scheme)):
     _ = await get_current_user(token)
     return token
+
+
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -222,7 +224,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     print("Last error, could not find the user in the database")
     raise CREDENTIALS_EXCEPTION
-   
+    
   
 @router.get('/logout')
 async def logout(token: str = Depends(get_current_user_token)):
@@ -234,9 +236,70 @@ async def logout(token: str = Depends(get_current_user_token)):
     
     return {'result': True}
 
-@router.get('/protected')
-async def protected(identifier: str = Depends(get_current_user)):
-    return {'identifier': identifier}
+
+@router.route('/{endpoint:path}', methods=['GET', 'POST'])
+async def reverse_proxy(request: Request):
+    if request.headers.get('authorization'):
+        identifier = request.headers.get('authorization').split(" ")[1]
+
+    else:
+        raise CREDENTIALS_EXCEPTION
+    
+    user = await get_current_user(identifier)
+    if (user):
+        client = request.app.state.client
+        url = httpx.URL(path=request.url.path, query=request.url.query.encode('utf-8'))
+        print(url)
+        req = client.build_request(
+            request.method, url, headers=request.headers.raw, content=request.stream()
+        )
+        r = await client.send(req, stream=True)
+        return StreamingResponse(
+            r.aiter_raw(),
+            status_code=r.status_code,
+            headers=r.headers,
+            background=BackgroundTask(r.aclose)
+        )
+    
+    else:
+        raise CREDENTIALS_EXCEPTION
+
+
+# @router.route('/kuber/{endpoint:path}'])
+# if authenticated, requests forwarded to the kuber server
+# @router.get('/kuber/{endpoint:path}')
+# async def forward(request: Request, identifier: str = Depends(get_current_user)):
+#     try:
+#         endpoint = request.path_params['endpoint']
+#         print(f"Forwarding get request to {KUBER_SERVER}/{endpoint}")
+        
+#         # async with httpx.AsyncClient() as client:
+#         #     response = await client.get(f"http://localhost:8000/{endpoint}", headers=request.headers)
+#         #     return JSONResponse(content=response.json(), status_code=response.status_code)
+#         print(identifier)
+#         return JSONResponse(content={"result": True, "identifier": identifier}, status_code=200 )
+        
+#     except:
+#         print("Could not forward request")
+#         raise KUBER_EXCEPTION
+    
+
+# @router.post('/kuber/{endpoint:path}')
+# async def forward(request: Request, identifier: str = Depends(get_current_user)):
+#     try:
+#         endpoint = request.path_params['endpoint']
+#         print(f"Forwarding post request to {KUBER_SERVER}/{endpoint}")
+#         # async with httpx.AsyncClient() as client:
+#             # response = await client.post(f"http://localhost:8000/{endpoint}", headers=request.headers, data=request.body)
+#             # return JSONResponse(content=response.json(), status_code=response.status_code)
+#         return JSONResponse(content={"result": True}, status_code=200)
+
+#     except:
+#         print("Could not forward request")
+#         raise KUBER_EXCEPTION
+  
+
+
 
 
 
