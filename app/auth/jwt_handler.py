@@ -2,9 +2,7 @@ from typing import Union
 from jose import jwt 
 from datetime import datetime, timedelta
 from decouple import config
-# from typing import Union
 import time
-from fastapi import HTTPException, status
 
 
 JWT_SECRET = config('JWT_SECRET')
@@ -13,36 +11,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30
 
 
-CREDENTIALS_EXCEPTION = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-ALREADY_REGISTERED_EXCEPTION = HTTPException(
-    status_code=400, 
-    detail="Username already registered"
-    )
-
-DATABASE_EXCEPTION = HTTPException(
-    status_code=500,
-    detail="Database error"
-)
-
-KUBER_EXCEPTION = HTTPException(
-    status_code=500,
-    detail="Kuber error"
-)
-
-INCORRENT_USERNAME_EXCEPTION = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username",
-        )
-
-INCORRENT_PASSWORD_EXCEPTION = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect password ",
-        )
 def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
     to_encode = data.copy()
     if expires_delta:
