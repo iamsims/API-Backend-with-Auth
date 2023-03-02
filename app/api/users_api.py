@@ -114,8 +114,8 @@ async def get_user_info_github(access_token):
     except:
         raise CREDENTIALS_EXCEPTION
 
-@router.post("/signup")
-async def signup(user: UserLoginSchema, status_code=status.HTTP_201_CREATED):
+@router.post("/signup", status_code=status.HTTP_201_CREATED)
+async def signup(user: UserLoginSchema):
     hashed_password = get_password_hash(user.password)
     data = UserinDB(**{"identifier": user.username, "provider": "password", "hashed_pw": hashed_password, "provider_id": user.username})
 
@@ -131,8 +131,8 @@ async def signup(user: UserLoginSchema, status_code=status.HTTP_201_CREATED):
     return JSONResponse({"result": True, "access_token": access_token, "token_type": "bearer"})
 
 
-@router.post("/token")
-async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends(), status_code=status.HTTP_200_OK):
+@router.post("/token",  status_code=status.HTTP_200_OK)
+async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends()):
 
     data = UserinDB(**{"identifier": form.username, "provider": "password", "provider_id": form.username})
     
