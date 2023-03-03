@@ -9,7 +9,7 @@ build:
     script:
         - docker info
         - if [ "$CI_COMMIT_REF_NAME" == "develop" ]; then COMMON_TAG="nightly"; elif [ "$CI_COMMIT_REF_NAME" == "master" ]; then COMMON_TAG="latest"; else COMMON_TAG=$CI_COMMIT_REF_SLUG; fi
-        - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA -t $CI_REGISTRY_IMAGE:$COMMON_TAG
+        - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA -t $CI_REGISTRY_IMAGE:$COMMON_TAG .
         - echo $CI_REGISTRY_PASSWORD | docker login --username $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
         - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
         - docker push $CI_REGISTRY_IMAGE:$COMMON_TAG
