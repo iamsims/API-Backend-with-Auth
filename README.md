@@ -149,7 +149,31 @@ Proxies requests to the specified endpoint on behalf of the authenticated user.
 If successful, this endpoint returns the response from the proxied endpoint. If an error occurs, an error response is returned.
 
 
+<br/>
 
+## User Profile
+
+#### `GET /user_profile`
+
+Gets the user profile of the current user from the database. 
+
+
+#### Request
+
+- Headers:
+    - Authorization (string): the user's JWT access token (must be in the format "Bearer <access token>")
+
+#### Response
+
+If successful, this endpoint returns a JSON object: 
+- Status Code: 200 OK
+- Body:
+    - identifier (boolean) - username 
+    - email (string)
+    - provider (string)
+    - provider_id (string)
+
+If an error occurs, an error response is returned.
 
 
 <br/>
