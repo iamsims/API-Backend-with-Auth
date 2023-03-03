@@ -30,6 +30,7 @@ async def add_user(data : UserinDB):
         else:
             user = User(
             identifier = data.identifier, 
+            email = data.email,
             hashed_pw =data.hashed_pw,
             provider = data.provider,
             provider_id = data.provider_id
@@ -45,7 +46,7 @@ async def get_all_users():
         return users
     
 
-async def get_user(data : UserLoginSchema):
+async def get_user(data : UserinDB):
     with Session(engine) as session:
         user = session.query(User).filter_by(identifier=data.identifier, provider = data.provider, provider_id = data.provider_id).first()
         return user

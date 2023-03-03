@@ -18,7 +18,7 @@ from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
 
-from app.controllers.db import add_user, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted
+from app.controllers.db import add_user, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted, get_all_users
 
 from app.models.users import UserinDB, UserLoginSchema
 
@@ -70,7 +70,7 @@ async def login(request: Request):
             redirect_uri = request.url_for('token', provider= "google")  # This creates the url for the /auth endpoint
             return await oauth.google.authorize_redirect(request, redirect_uri)
         case "github":
-            return RedirectResponse(url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}', status_code = 302) 
+            return RedirectResponse(url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope=user', status_code = 302) 
         case _:
             return JSONResponse({'result': False, 'message': 'Invalid provider'}, status_code=400)        
 
@@ -109,15 +109,20 @@ async def get_user_info_github(access_token):
         async with httpx.AsyncClient() as client:
             headers.update({"Authorization": f"Bearer {access_token}"})
             response = await client.get('https://api.github.com/user', headers=headers)
-        return response.json()
+            response_json = response.json()
+            if response_json['email'] is None:
+                email_response = await client.get('https://api.github.com/user/emails', headers=headers)
+                response_json['email'] = email_response.json()[0]['email']
+
+        return response_json
     
     except:
         raise CREDENTIALS_EXCEPTION
 
-@router.post("/signup")
-async def signup(user: UserLoginSchema, status_code=status.HTTP_201_CREATED):
-    hashed_password = get_password_hash(user.password)
-    data = UserinDB(**{"identifier": user.username, "provider": "password", "hashed_pw": hashed_password, "provider_id": user.username})
+@router.post("/signup", status_code=status.HTTP_201_CREATED)
+async def signup(form : OAuth2PasswordRequestForm = Depends()):
+    hashed_password = get_password_hash(form.password)
+    data = UserinDB(**{"identifier": form.username, "provider": "password", "hashed_pw": hashed_password, "provider_id": form.username})
 
     user_exists = await is_user_in_db(data)
     if user_exists:
@@ -131,8 +136,8 @@ async def signup(user: UserLoginSchema, status_code=status.HTTP_201_CREATED):
     return JSONResponse({"result": True, "access_token": access_token, "token_type": "bearer"})
 
 
-@router.post("/token")
-async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends(), status_code=status.HTTP_200_OK):
+@router.post("/token", status_code=status.HTTP_200_OK)
+async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends()):
 
     data = UserinDB(**{"identifier": form.username, "provider": "password", "provider_id": form.username})
     
@@ -162,7 +167,9 @@ async def token(request: Request):
             try:
                 access_token = await get_google_token(request)
                 user_email, provider_id = access_token['userinfo']["email"] , access_token['userinfo']["sub"]
-                data = {"identifier": user_email, "provider": "google", "provider_id": provider_id}
+                
+                data = {"identifier": user_email, "email": user_email, "provider": "google", "provider_id": provider_id}
+                print(data)
             except:
                 print("Could not get email")
                 raise CREDENTIALS_EXCEPTION
@@ -171,8 +178,9 @@ async def token(request: Request):
             try:
                 access_token = await get_github_token(request.query_params['code'])
                 user_info = await get_user_info_github(access_token)
-                user_id, username  = user_info['id'], user_info["login"]
-                data = {"provider_id": user_id, "identifier" : username , "provider": "github" }            
+                # return user_info
+                user_id, username, user_email  = user_info['id'], user_info["login"], user_info['email']
+                data = {"provider_id": user_id, "email": user_email, "identifier" : username , "provider": "github" }            
             except:
                 print("Could not get email")
                 raise CREDENTIALS_EXCEPTION
@@ -180,13 +188,14 @@ async def token(request: Request):
 
     try : 
         data_ = UserinDB(**data) 
+        data.pop('email')
         user_exists = await is_user_in_db(data_) 
         if not user_exists:
             await add_user(data_)
 
     except:
         raise DATABASE_EXCEPTION
-
+    
     local_token = create_access_token(data=data)
     refresh_token = create_refresh_token(data = data)
     return JSONResponse({'result': True, 'access_token': local_token, "token_type": "bearer"})
@@ -194,13 +203,11 @@ async def token(request: Request):
 
 
 async def get_current_user_token(token: str = Depends(oauth2_scheme)):
-    _ = await get_current_user(token)
+    _ = await get_current_user_info(token)
     return token
 
 
-
-
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user_info(token: str = Depends(oauth2_scheme)):
     if await is_token_blacklisted(token):
         print("Token is blacklisted")
         raise CREDENTIALS_EXCEPTION
@@ -217,13 +224,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         print("JWT Error")
         raise CREDENTIALS_EXCEPTION
-
+    
     data = UserinDB(**{"identifier": identifier, "provider": provider, "provider_id": provider_id})
-    if await is_user_in_db(data):
-        return identifier
 
-    print("Last error, could not find the user in the database")
+    if await is_user_in_db(data):
+        return data
+    
     raise CREDENTIALS_EXCEPTION
+
+
+async def get_current_user_identifier(data : UserinDB = Depends(get_current_user_info)):
+    print(data)
+    return data.identifier
     
   
 @router.get('/logout')
@@ -240,12 +252,12 @@ async def logout(token: str = Depends(get_current_user_token)):
 @router.route('/{endpoint:path}', methods=['GET', 'POST'])
 async def reverse_proxy(request: Request):
     if request.headers.get('authorization'):
-        identifier = request.headers.get('authorization').split(" ")[1]
+        token = request.headers.get('authorization').split(" ")[1]
 
     else:
         raise CREDENTIALS_EXCEPTION
     
-    user = await get_current_user(identifier)
+    user = await get_current_user_info(token)
     if (user):
         client = request.app.state.client
         url = httpx.URL(path=request.url.path, query=request.url.query.encode('utf-8'))
@@ -263,6 +275,10 @@ async def reverse_proxy(request: Request):
     
     else:
         raise CREDENTIALS_EXCEPTION
+    
+
+    
+
 
 
 # @router.route('/kuber/{endpoint:path}'])

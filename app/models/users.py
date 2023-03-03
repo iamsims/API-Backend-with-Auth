@@ -10,6 +10,7 @@ class TokenData(BaseModel):
 
 class UserinDB(BaseModel):
     identifier : str
+    email: Union[str, None] = None
     hashed_pw: Union[str, None] = None
     provider: str
     provider_id: Union[str, None] = None
