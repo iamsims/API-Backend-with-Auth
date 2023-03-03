@@ -249,6 +249,22 @@ async def logout(token: str = Depends(get_current_user_token)):
     return {'result': True}
 
 
+@router.get('/user_profile')
+async def get_user_profile(data : UserinDB = Depends(get_current_user_info)):
+    try:
+        all =await get_user(data)
+        profile = {
+            "identifier": all.identifier,
+            "provider": all.provider,
+            "provider_id": all.provider_id,
+            "email": all.email
+        }
+        return profile
+    
+    except:
+        raise DATABASE_EXCEPTION
+
+
 @router.route('/{endpoint:path}', methods=['GET', 'POST'])
 async def reverse_proxy(request: Request):
     if request.headers.get('authorization'):
