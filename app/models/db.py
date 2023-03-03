@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import String
+from sqlalchemy import BigInteger, String
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -16,8 +16,10 @@ hashed_pw is the hashed password of the user
 class User(Base):
     __tablename__ = "users"
     identifier: Mapped[str]  = mapped_column(primary_key=True)
+    email: Mapped[Optional[str]]
     hashed_pw: Mapped[Optional[str]]
-    provider_id: Mapped[Optional[int]] = mapped_column(primary_key=True)
+    # provider_id can be removed from primary keys
+    provider_id: Mapped[str] = mapped_column(primary_key=True) 
     provider: Mapped[str] = mapped_column( primary_key=True)
     
     def __repr__(self) -> str:
