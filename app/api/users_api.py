@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 
 import httpx
 from jose import JWTError
-
+from urllib.parse import quote
 from starlette.config import Config
 from authlib.integrations.starlette_client import OAuth
 from starlette.responses import JSONResponse
@@ -70,7 +70,9 @@ async def login(request: Request):
             redirect_uri = request.url_for('token', provider= "google")  # This creates the url for the /auth endpoint
             return await oauth.google.authorize_redirect(request, redirect_uri)
         case "github":
-            return RedirectResponse(url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope=user', status_code = 302) 
+            scope = "read:user user:email"
+            encoded_scope = quote(scope)
+            return RedirectResponse(url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope={encoded_scope}', status_code = 302) 
         case _:
             return JSONResponse({'result': False, 'message': 'Invalid provider'}, status_code=400)        
 
@@ -94,7 +96,9 @@ async def get_github_token(code : str):
         headers = { "Accept": "application/json" }
         async with httpx.AsyncClient() as client:
             r = await client.post(url = 'https://github.com/login/oauth/access_token', params=params, headers=headers)
+
         response_json = r.json()
+        print(response_json)
         access_token = response_json['access_token']
 
     except:
