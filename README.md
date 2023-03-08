@@ -23,7 +23,8 @@ Initiates the authentication process with the specified provider.
 
 ##### Response
 
-If successful, this endpoint returns a redirect to the provider's authentication page. If the provider is not recognized or an error occurs, an error response is returned.
+- `RedirectResponse`: If the user is not authenticated, they are redirected to the authentication page of the specified provider.
+-  `JSONResponse`: If the specified provider is not supported or an error occurs during the authentication process, then this response is returned with the result field set to False and the message field containing an error message.
 
 
 <br/>
@@ -40,21 +41,18 @@ Returns an access token for the specified provider. This endpoint is redirected 
 Handled by the provider itself. 
 
 - Path Parameters:
-    - provider (string): the provider for the access token (either "google" or "github")
+    - `provider` (string): the provider for the access token (either "google" or "github")
 - Query Parameters:
-    - code (string): the authorization code for the provider
+    - `code` (string): the authorization code for the provider
 
 ##### Response
 
-If successful, this endpoint returns a JSON object containing the access token for the authenticated user.
-
-- Status Code: 201 Created
+If successful, this endpoint returns a JSON object and sets the cookie for the authenticated user. 
+- Status Code: 200 OK
 - Body:
-    - result (boolean): whether the operation succeeded
-    - access_token (string): the JWT access token for the user
-    - token_type (string): the type of the token (must be "bearer")
+    - `result` (boolean): whether the operation succeeded
 
- If an error occurs, an error response is returned.
+If an error occurs, an error response is returned.
 
 <br/>
 
@@ -71,12 +69,11 @@ Creates a new user account with the given credentials.
 
 ##### Response
 
-If successful, this endpoint returns a JSON object containing the access token for the new user account. 
-- Status Code: 201 Created
+If successful, this endpoint returns a JSON object and sets the cookie for the authenticated user. 
+- Status Code: 200 OK
 - Body:
-    - result (boolean): whether the operation succeeded
-    - access_token (string): the JWT access token for the user
-    - token_type (string): the type of the token (must be "bearer")
+    - `result` (boolean): whether the operation succeeded
+
 
 If the username is already taken or an error occurs, an error response is returned.
 
@@ -95,12 +92,10 @@ Authenticates the user with the given credentials and returns an access token.
 
 ##### Response
 
-If successful, this endpoint returns a JSON object containing the access token for the authenticated user. 
+If successful, this endpoint returns a JSON object and sets the cookie for the authenticated user. 
 - Status Code: 200 OK
 - Body:
-    - result (boolean): whether the operation succeeded
-    - access_token (string): the JWT access token for the user
-    - token_type (string): the type of the token (must be "bearer")
+    - `result` (boolean): whether the operation succeeded
 
 
 If the credentials are invalid or an error occurs, an error response is returned.
@@ -116,14 +111,14 @@ Logs out the user by blacklisting their JWT access token.
 #### Request
 
 - Headers:
-    - Authorization (string): the user's JWT access token (must be in the format "Bearer <access token>")
+    - Cookie (key:value): `access_token` consists of JWT token
 
 #### Response
 
 If successful, this endpoint returns a JSON object: 
 - Status Code: 200 OK
 - Body:
-    - result (boolean): whether the operation succeeded
+    - `result` (boolean): whether the operation succeeded
 
 If an error occurs, an error response is returned.
 
@@ -139,9 +134,10 @@ Proxies requests to the specified endpoint on behalf of the authenticated user.
 ##### Request 
 
 - Path Parameters:
-    - endpoint (string): the endpoint on the backend server to forward the request to
+    - `endpoint` (string): the endpoint on the backend server to forward the request to
+
 - Headers:
-    - Authorization (string): the user's JWT access token (must be in the format "Bearer <access token>")
+    - Cookie (key:value): `access_token` consists of JWT token
     - Other headers as needed for the request being forwarded
 
 ##### Response
@@ -161,17 +157,17 @@ Gets the user profile of the current user from the database.
 #### Request
 
 - Headers:
-    - Authorization (string): the user's JWT access token (must be in the format "Bearer <access token>")
+    - Cookie (key:value): `access_token` consists of JWT token
 
 #### Response
 
 If successful, this endpoint returns a JSON object: 
 - Status Code: 200 OK
 - Body:
-    - identifier (boolean) - username 
-    - email (string)
-    - provider (string)
-    - provider_id (string)
+    - `identifier` (boolean) - username 
+    - `email` (string)
+    - `provider` (string)
+    - `provider_id` (string)
 
 If an error occurs, an error response is returned.
 
