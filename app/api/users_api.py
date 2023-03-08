@@ -259,7 +259,7 @@ async def logout(token: str = Depends(get_current_user_token)):
         print("Could not add token to blacklist")
         raise DATABASE_EXCEPTION
     
-    return {'result': True}
+    return JSONResponse(content={"result": True}, status_code=200)
     
 
 
@@ -303,6 +303,7 @@ async def reverse_proxy(request: Request):
             headers=r.headers,
             background=BackgroundTask(r.aclose)
         )
+
 
     
     else:
