@@ -3,12 +3,11 @@ from jose import jwt
 from datetime import datetime, timedelta
 from decouple import config
 import time
+from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
 
 
 JWT_SECRET = config('JWT_SECRET')
 JWT_ALGORITHM = config('JWT_ALGORITHM')
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30
 
 
 def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):

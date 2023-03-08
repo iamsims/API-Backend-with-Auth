@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, status 
+import datetime
+from typing import Union
+from fastapi import APIRouter, Cookie, Depends, Response, status 
 
 import httpx
 from jose import JWTError
@@ -13,7 +15,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from decouple import config
 
-from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION
+from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION
 from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_token
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
@@ -24,6 +26,7 @@ from app.models.users import UserinDB, UserLoginSchema
 
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
+from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
 
 # OAuth settings
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID') or None
@@ -59,9 +62,6 @@ oauth.register(
 router = APIRouter()
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
 @router.get('/login/{provider}')
 async def login(request: Request):
     provider = request.path_params['provider']
@@ -75,6 +75,7 @@ async def login(request: Request):
             return RedirectResponse(url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope={encoded_scope}', status_code = 302) 
         case _:
             return JSONResponse({'result': False, 'message': 'Invalid provider'}, status_code=400)        
+
 
 
 async def get_google_token(request: Request):
@@ -137,7 +138,10 @@ async def signup(form : OAuth2PasswordRequestForm = Depends()):
     access_token = create_access_token(
         data=vars(data),
     )
-    return JSONResponse({"result": True, "access_token": access_token, "token_type": "bearer"})
+
+    response = JSONResponse(content={"result": True}, status_code=200)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+    return response
 
 
 @router.post("/token", status_code=status.HTTP_200_OK)
@@ -159,12 +163,13 @@ async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends()):
         data=vars(data),
     )
 
-    return JSONResponse({"result": True, "access_token": access_token, "token_type": "bearer"})
-
+    response = JSONResponse(content={"result": True}, status_code=200)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+    return response
 
 
 @router.get('/token/{provider}')
-async def token(request: Request):
+async def token(request: Request, response: Response):
     provider = request.path_params['provider']
     match provider:
         case "google":
@@ -201,22 +206,30 @@ async def token(request: Request):
         raise DATABASE_EXCEPTION
     
     local_token = create_access_token(data=data)
-    refresh_token = create_refresh_token(data = data)
-    return JSONResponse({'result': True, 'access_token': local_token, "token_type": "bearer"})
+    # refresh_token = create_refresh_token(data = data)
+
+    # set cookie in response
+    response = JSONResponse(content={"result": True}, status_code=200)
+    response.set_cookie(key="access_token", value=local_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+    return response
 
 
+async def get_current_user_token(access_token: Union[str, None] = Cookie(None)):
+    if access_token is None:
+        raise COOKIE_EXCEPTION
+    _ = await get_current_user_info(access_token)
+    return access_token
 
-async def get_current_user_token(token: str = Depends(oauth2_scheme)):
-    _ = await get_current_user_info(token)
-    return token
 
-
-async def get_current_user_info(token: str = Depends(oauth2_scheme)):
-    if await is_token_blacklisted(token):
+async def get_current_user_info(access_token: Union[str, None] = Cookie(None)):
+    if access_token is None:
+        raise COOKIE_EXCEPTION
+    
+    if await is_token_blacklisted(access_token):
         print("Token is blacklisted")
         raise CREDENTIALS_EXCEPTION
     try:
-        payload = decodeJWT(token=token)
+        payload = decodeJWT(token=access_token)
         identifier: str = payload.get('identifier')
         provider: str = payload.get('provider')
         provider_id = payload.get('provider_id')
@@ -236,21 +249,18 @@ async def get_current_user_info(token: str = Depends(oauth2_scheme)):
     
     raise CREDENTIALS_EXCEPTION
 
-
-async def get_current_user_identifier(data : UserinDB = Depends(get_current_user_info)):
-    print(data)
-    return data.identifier
-    
   
 @router.get('/logout')
 async def logout(token: str = Depends(get_current_user_token)):
     try :
         await add_blacklist_token(token)
+
     except:
         print("Could not add token to blacklist")
         raise DATABASE_EXCEPTION
     
     return {'result': True}
+    
 
 
 @router.get('/user_profile')
@@ -271,17 +281,18 @@ async def get_user_profile(data : UserinDB = Depends(get_current_user_info)):
 
 @router.route('/{endpoint:path}', methods=['GET', 'POST'])
 async def reverse_proxy(request: Request):
-    if request.headers.get('authorization'):
-        token = request.headers.get('authorization').split(" ")[1]
-
+    if request.cookies.get('access_token'):
+        token = request.cookies.get('access_token')
+        print(token)
     else:
-        raise CREDENTIALS_EXCEPTION
+        raise COOKIE_EXCEPTION
     
     user = await get_current_user_info(token)
     if (user):
         client = request.app.state.client
         url = httpx.URL(path=request.url.path, query=request.url.query.encode('utf-8'))
         print(url)
+
         req = client.build_request(
             request.method, url, headers=request.headers.raw, content=request.stream()
         )
@@ -292,6 +303,7 @@ async def reverse_proxy(request: Request):
             headers=r.headers,
             background=BackgroundTask(r.aclose)
         )
+
     
     else:
         raise CREDENTIALS_EXCEPTION
@@ -361,7 +373,9 @@ async def reverse_proxy(request: Request):
 
 
 
-
+# async def get_current_user_identifier(data : UserinDB = Depends(get_current_user_info)):
+#     return data.identifier
+  
 
 # Comment out the following lines to test users in db
 
