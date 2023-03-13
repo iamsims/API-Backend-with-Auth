@@ -1,4 +1,5 @@
 import datetime
+import secrets
 from typing import Union
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status 
 
@@ -13,6 +14,7 @@ from authlib.integrations.starlette_client import OAuthError
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from decouple import config
+from app.auth.api_key import get_api_key
 
 from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
@@ -201,9 +203,8 @@ async def get_current_user_info(access_token: Union[str, None] = Cookie(None)):
         return data
     
     raise CREDENTIALS_EXCEPTION
-    
 
-  
+
 @router.get('/logout')
 async def logout(token: str = Depends(get_current_user_token)):
     try :
@@ -215,7 +216,19 @@ async def logout(token: str = Depends(get_current_user_token)):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in logout"
         )
+
+
+@router.get("/generate_api_key")
+async def api_key(data : UserinDB = Depends(get_current_user_info)):
+    try:
+        api_key = await get_api_key(data)
+        return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
     
+    except:
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in ksks generating api key"
+        )
 
 @router.get('/user_profile')
 async def get_user_profile(data : UserinDB = Depends(get_current_user_info)):
