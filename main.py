@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from app.api.users_api import router as users_router
 
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
 import httpx
+
 
 SECRET_KEY = config('SECRET_KEY') or None
 if SECRET_KEY is None:
@@ -15,7 +16,6 @@ if KUBER_SERVER is None:
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-
 
 app.include_router(users_router)
 
