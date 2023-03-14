@@ -14,16 +14,16 @@ from authlib.integrations.starlette_client import OAuthError
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from decouple import config
-from app.auth.api_key import get_api_key
+from app.auth.api_key import generate_api_key
 
-from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
+from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 # from app.constants.exceptions import PROVIDER_EXCEPTION, MyException
 from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_token
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
 
-from app.controllers.db import add_user, get_user, is_user_in_db, add_blacklist_token, is_token_blacklisted, get_all_users
+from app.controllers.db import add_api_key, add_user, get_all_api_keys, get_api_keys, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id
 
 from app.models.users import UserinDB, UserLoginSchema
 
@@ -40,7 +40,11 @@ if KUBER_SERVER is None:
 router = APIRouter()
 
 
-from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth
+from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
+
+
+
+
 
 @router.get('/login/{provider}')
 async def login(request: Request):
@@ -62,7 +66,8 @@ async def login(request: Request):
     except PROVIDER_EXCEPTION:
         raise PROVIDER_EXCEPTION
 
-    except:
+    except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in login"
@@ -73,25 +78,31 @@ async def login(request: Request):
 async def signup(form : OAuth2PasswordRequestForm = Depends()):
     try:
         hashed_password = get_password_hash(form.password)
-        data = UserinDB(**{"identifier": form.username, "provider": "password", "hashed_pw": hashed_password, "provider_id": form.username})
+        data = UserinDB(**{"identifier": form.username, "provider": "password", "hashed_pw": hashed_password})
         
-        user_exists = await is_user_in_db(data)
+        user_exists = await users_exists_by_data(data)
         if user_exists:
             raise ALREADY_REGISTERED_EXCEPTION
         
-        await add_user(data)
+        id = await add_user(data)
         
         access_token = create_access_token(
-            data=vars(data),
+            data={"id": id},
         )
+
+        print(id)
         response = JSONResponse(content={"result": True}, status_code=200)
         response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
         return response
     
     except ALREADY_REGISTERED_EXCEPTION:
         raise ALREADY_REGISTERED_EXCEPTION
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
 
-    except:
+    except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in signup"
@@ -101,29 +112,36 @@ async def signup(form : OAuth2PasswordRequestForm = Depends()):
 @router.post("/token", status_code=status.HTTP_200_OK)
 async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends()):
     try:
-        data = UserinDB(**{"identifier": form.username, "provider": "password", "provider_id": form.username})
-        user_exists = await is_user_in_db(data)
+        data = UserinDB(**{"identifier": form.username, "provider": "password"})
+        user_exists = await users_exists_by_data(data)
         if not user_exists:
             raise INCORRECT_USERNAME_EXCEPTION
-        user_in_db = await get_user(data)
+        user_in_db = await get_user_by_data(data)
+
+        print(user_in_db, "user_in_db")
+
         if not verify_password(form.password, user_in_db.hashed_pw):
             raise INCORRECT_PASSWORD_EXCEPTION
         access_token = create_access_token(
-            data=vars(data),
+            data={"id": user_in_db.id},
         )
+        print(user_in_db.id)
 
         response = JSONResponse(content={"result": True}, status_code=200)
         response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
         return response
     
-    except INCORRECT_USERNAME_EXCEPTION as e:
+    except INCORRECT_USERNAME_EXCEPTION:
         raise INCORRECT_USERNAME_EXCEPTION
     
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
 
-    except INCORRECT_PASSWORD_EXCEPTION as e:
+    except INCORRECT_PASSWORD_EXCEPTION:
         raise INCORRECT_PASSWORD_EXCEPTION
 
-    except:
+    except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in login"
@@ -139,25 +157,37 @@ async def token(request: Request, response: Response):
             case "google":
                 access_token = await get_google_token(request)
                 user_email, provider_id = access_token['userinfo']["email"] , access_token['userinfo']["sub"]
-                data = {"identifier": user_email, "email": user_email, "provider": "google", "provider_id": provider_id}
+                data = UserinDB(
+                    identifier = user_email,
+                    email = user_email,
+                    provider = "google",
+                    provider_id = provider_id
+                )
+                
             
             case "github":
                 access_token = await get_github_token(request.query_params['code'])
                 user_info = await get_user_info_github(access_token)
                 user_id, username, user_email  = user_info['id'], user_info["login"], user_info['email']
-                data = {"provider_id": user_id, "email": user_email, "identifier" : username , "provider": "github" }            
+                data = UserinDB(
+                    identifier = username,
+                    email = user_email,
+                    provider = "github",
+                    provider_id = user_id
+                )
 
             case _:
                 raise PROVIDER_EXCEPTION
             
-        data_ = UserinDB(**data) 
-        data.pop('email')
-        user_exists = await is_user_in_db(data_) 
+        user_exists = await users_exists_by_data(data) 
         if not user_exists:
-            await add_user(data_)
+            id = await add_user(data)
+
+        else:
+            id = await get_user_id_by_data(data)
 
     
-        local_token = create_access_token(data=data)
+        local_token = create_access_token(data={"id": id})
         response = JSONResponse(content={"result": True}, status_code=200)
         response.set_cookie(key="access_token", value=local_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
         return response
@@ -165,42 +195,41 @@ async def token(request: Request, response: Response):
 
     except PROVIDER_EXCEPTION:
         raise PROVIDER_EXCEPTION
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
 
-    except:
+    except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in obtaining token"
         )
-    
-
 
 async def get_current_user_token(access_token: Union[str, None] = Cookie(None)):
     if access_token is None:
         raise COOKIE_EXCEPTION
-    _ = await get_current_user_info(access_token)
+    _ = await get_current_user_id(access_token)
     return access_token
 
-
-
-async def get_current_user_info(access_token: Union[str, None] = Cookie(None)):
+async def get_current_user_id(access_token: Union[str, None] = Cookie(None)):
     if access_token is None:
         raise COOKIE_EXCEPTION
 
     if await is_token_blacklisted(access_token):
         print("Token is blacklisted")
         raise CREDENTIALS_EXCEPTION
+    
     payload = decodeJWT(token=access_token)
-    identifier: str = payload.get('identifier')
-    provider: str = payload.get('provider')
-    provider_id = payload.get('provider_id')
+    id = payload.get("id")
     
-    if identifier is None or provider is None or provider_id is None:
-        print("Identifier, provider or provider_id could not be extracted")
+    if id is None:
+        print("id could not be extracted")
         raise CREDENTIALS_EXCEPTION
-    data = UserinDB(**{"identifier": identifier, "provider": provider, "provider_id": provider_id})
     
-    if await is_user_in_db(data):
-        return data
+    user_exists = await users_exists_by_id(id)
+    if user_exists:
+        return id 
     
     raise CREDENTIALS_EXCEPTION
 
@@ -210,43 +239,81 @@ async def logout(token: str = Depends(get_current_user_token)):
     try :
         await add_blacklist_token(token)
         return JSONResponse(content={"result": True}, status_code=200)
-
-    except:
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in logout"
         )
 
 
-@router.get("/generate_api_key")
-async def api_key(data : UserinDB = Depends(get_current_user_info)):
+@router.get('/get_api_keys')
+async def api_keys(id:int = Depends(get_current_user_id)):
     try:
-        api_key = await get_api_key(data)
-        return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
+        api_keys = await get_api_keys(id)
+        return api_keys
     
-    except:
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in ksks generating api key"
+        detail="Exception in getting api keys"
+        )
+
+@router.get("/generate_api_key")
+async def api_key(id :int = Depends(get_current_user_id)):
+    try:
+        api_key = generate_api_key()
+        await add_api_key(id, api_key)
+        return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in generating api key"
         )
 
 @router.get('/user_profile')
-async def get_user_profile(data : UserinDB = Depends(get_current_user_info)):
+async def get_user_profile(id :int = Depends(get_current_user_id)):
     try:
-        all =await get_user(data)
+        data =await get_user_by_id(id)
         profile = {
-            "identifier": all.identifier,
-            "provider": all.provider,
-            "provider_id": all.provider_id,
-            "email": all.email
+            "identifier": data.identifier,
+            "provider": data.provider,
+            "provider_id": data.provider_id,
+            "email": data.email
         }
         return profile
     
-    except:
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in getting user profile"
         )
+
+# @router.get("/testall")
+# async def testall():
+#     return await get_all_api_keys()
+
+# @router.get("/usersall")
+# async def testall():
+#     return await get_all_users()
+
 
 
 @router.route('/{endpoint:path}', methods=['GET', 'POST'])
@@ -254,16 +321,14 @@ async def reverse_proxy(request: Request):
     try:
         if request.cookies.get('access_token'):
             token = request.cookies.get('access_token')
-            print(token)
         else:
             raise COOKIE_EXCEPTION
     
-        user = await get_current_user_info(token)
-        if (user):
+        id = await get_current_user_id(token)
+        if (id):
             try:
                 client = request.app.state.client
                 url = httpx.URL(path=request.url.path, query=request.url.query.encode('utf-8'))
-                print(url)
 
                 req = client.build_request(
                     request.method, url, headers=request.headers.raw, content=request.stream()
@@ -276,7 +341,9 @@ async def reverse_proxy(request: Request):
                     background=BackgroundTask(r.aclose)
                 )
 
-            except:
+
+            except Exception as e:
+                print(e)
                 raise KUBER_EXCEPTION
     
         else:
@@ -289,7 +356,11 @@ async def reverse_proxy(request: Request):
         detail=e.detail,
     )
 
-    except:
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+
+    except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in reverse proxy"
@@ -315,7 +386,8 @@ async def reverse_proxy(request: Request):
 # #         print(identifier)
 # #         return JSONResponse(content={"result": True, "identifier": identifier}, status_code=200 )
         
-# #     except:
+# #      except Exception as e:
+        # print(e)
 # #         print("Could not forward request")
 # #         raise KUBER_EXCEPTION
     
@@ -330,7 +402,8 @@ async def reverse_proxy(request: Request):
 # #             # return JSONResponse(content=response.json(), status_code=response.status_code)
 # #         return JSONResponse(content={"result": True}, status_code=200)
 
-# #     except:
+# #      except Exception as e:
+        # print(e)
 # #         print("Could not forward request")
 # #         raise KUBER_EXCEPTION
   
@@ -361,22 +434,19 @@ async def reverse_proxy(request: Request):
 
 
 
-# # async def get_current_user_identifier(data : UserinDB = Depends(get_current_user_info)):
+# # async def get_current_user_identifier(data : UserinDB = Depends(get_current_user_id)):
 # #     return data.identifier
   
 
 # # Comment out the following lines to test users in db
 
 # # async def add_if_not_in_db(data: UserinDB ):
-# #     user_exists  = await is_user_in_db(data)
+# #     user_exists  = await users_exists_by_data(data)
 # #     if not user_exists:
 # #         print("Adding user")
 # #         await add_user(data)
 
 
-# # @router.get("/testall")
-# # async def testall():
-# #     return await get_all_users()
 
 # # @router.get("/test")
 # # async def test():
