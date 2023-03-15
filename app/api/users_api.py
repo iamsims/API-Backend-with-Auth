@@ -16,20 +16,22 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from decouple import config
 from app.auth.api_key import generate_api_key
 
-from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
+from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_FINISHED_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 # from app.constants.exceptions import PROVIDER_EXCEPTION, MyException
 from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_token
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
 
-from app.controllers.db import add_api_key, add_user, get_all_api_keys, get_api_keys, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id
+from app.controllers.db import add_api_key, add_user, decrement_endpoint_credit_for_user, get_api_keys, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id, get_credit_for_user, add_credit_for_user, get_endpoint_credit_for_user
 
 from app.models.users import UserinDB, UserLoginSchema
 
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
+from app.models.db import KUBER_ENDPOINTS_IN_DB
+from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
 
 
 KUBER_SERVER = config('KUBER_SERVER') or None
@@ -38,12 +40,6 @@ if KUBER_SERVER is None:
 
 
 router = APIRouter()
-
-
-from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
-
-
-
 
 
 @router.get('/login/{provider}')
@@ -73,6 +69,16 @@ async def login(request: Request):
         detail="Exception in login"
         )
     
+async def initialize_user(data):
+    id = await add_user(data)
+    initial_credit = {
+        "endpoint1" : 100,
+        "endpoint2" : 100,
+        "endpoint3" : 100,
+    }
+    await add_credit_for_user(id, initial_credit)
+    # await add_credit_for_user(id, 1000)
+    return id 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(form : OAuth2PasswordRequestForm = Depends()):
@@ -84,7 +90,7 @@ async def signup(form : OAuth2PasswordRequestForm = Depends()):
         if user_exists:
             raise ALREADY_REGISTERED_EXCEPTION
         
-        id = await add_user(data)
+        id = await initialize_user(data)
         
         access_token = create_access_token(
             data={"id": id},
@@ -181,8 +187,7 @@ async def token(request: Request, response: Response):
             
         user_exists = await users_exists_by_data(data) 
         if not user_exists:
-            id = await add_user(data)
-
+            id = await initialize_user(data)
         else:
             id = await get_user_id_by_data(data)
 
@@ -325,8 +330,11 @@ async def reverse_proxy(request: Request):
             raise COOKIE_EXCEPTION
     
         id = await get_current_user_id(token)
+
+        
         if (id):
             try:
+               
                 client = request.app.state.client
                 url = httpx.URL(path=request.url.path, query=request.url.query.encode('utf-8'))
 
@@ -340,8 +348,10 @@ async def reverse_proxy(request: Request):
                     headers=r.headers,
                     background=BackgroundTask(r.aclose)
                 )
-
-
+            
+            except KeyError:
+                raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
+        
             except Exception as e:
                 print(e)
                 raise KUBER_EXCEPTION
@@ -350,7 +360,7 @@ async def reverse_proxy(request: Request):
             raise CREDENTIALS_EXCEPTION
         
 
-    except COOKIE_EXCEPTION or CREDENTIALS_EXCEPTION or KUBER_EXCEPTION as e:
+    except COOKIE_EXCEPTION or CREDENTIALS_EXCEPTION or KUBER_EXCEPTION or ENDPOINT_DOES_NOT_EXIST_EXCEPTION or CREDIT_FINISHED_EXCEPTION as e:
         raise HTTPException(
         status_code=e.status_code,
         detail=e.detail,

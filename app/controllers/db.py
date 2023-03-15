@@ -1,8 +1,8 @@
 import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from app.constants.exceptions import DATABASE_EXCEPTION
-from app.models.db import Base, Blacklist, User, ApiKey
+from app.constants.exceptions import DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION
+from app.models.db import KUBER_ENDPOINTS_IN_DB, Base, Blacklist, CreditTracking, User, ApiKey
 from sqlalchemy import URL
 from decouple import config
 
@@ -187,6 +187,59 @@ async def is_token_blacklisted(id : int):
                 return True
             return False
         
+    except Exception as e :
+        print(e)
+        raise DATABASE_EXCEPTION
+    
+
+async def add_credit_for_user(id : int, credit_dict :dict):
+    try:
+        with Session(engine) as session:
+            user = await get_user_by_id(id)
+            credit = CreditTracking (user=user, user_id=id)
+            for key, value in credit_dict.items():
+                setattr(credit, key, value)
+
+            session.add(credit)
+            session.commit()
+    
+    except Exception as e :
+        print(e)
+        raise DATABASE_EXCEPTION
+
+
+async def get_credit_for_user(id : int):
+    try:
+        with Session(engine) as session:
+            user = await get_user_by_id(id)
+            return user.credit_tracking
+    
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+    
+
+async def get_endpoint_credit_for_user(id : int, endpoint : str):
+    try:
+        with Session(engine) as session:
+            user = await get_user_by_id(id)
+            return getattr(user.credit_tracking, endpoint)
+    
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+    
+
+async def decrement_endpoint_credit_for_user(id : int, endpoint :str):
+    try:
+        with Session(engine) as session:
+            user = await get_user_by_id(id)
+            credit = user.credit_tracking
+            new_value = getattr(credit, endpoint) - 1
+            setattr(credit, endpoint, new_value)
+            session.commit()
+
+   
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION

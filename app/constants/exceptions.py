@@ -35,7 +35,19 @@ class COOKIE_EXCEPTION(HTTPException):
         self.detail = "Could not get cookie"
         super().__init__(status_code=self.status_code, detail=self.detail)
 
+class ENDPOINT_DOES_NOT_EXIST_EXCEPTION(HTTPException):
+    def __init__(self):
+        self.status_code = status.HTTP_400_BAD_REQUEST
+        self.detail = "The endpoint doesn't exist in Kuber"
+        super().__init__(status_code=self.status_code, detail=self.detail)
 
+
+
+class CREDIT_FINISHED_EXCEPTION(HTTPException):
+    def __init__(self):
+        self.status_code = status.HTTP_400_BAD_REQUEST
+        self.detail = "You have finished your credit for this endpoint"
+        super().__init__(status_code=self.status_code, detail=self.detail)
 
 class ALREADY_REGISTERED_EXCEPTION(HTTPException):
     def __init__(self):
