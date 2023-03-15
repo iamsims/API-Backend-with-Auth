@@ -21,7 +21,7 @@ class User(Base):
     provider_id = Column(String, nullable = True)
     provider = Column(String)
     api_keys = relationship("ApiKey", back_populates="user", cascade='all, delete-orphan')
-    credit_tracking = relationship("CreditTracking", back_populates="user", cascade='all, delete-orphan')
+    credit_tracking = relationship("CreditTracking", back_populates="user",uselist=False, cascade='all, delete-orphan')
     
     def __repr__(self) -> str:
         return f"User( identifier= {self.identifier} provider_id = {self.provider_id}, provider={self.provider}, hashed_password = {self.hashed_pw})"
@@ -56,8 +56,8 @@ class CreditTracking (Base):
 
 
 KUBER_ENDPOINTS_IN_DB = {
-    "api/v1/tx" : "endpoint1",
-    "api/v1/time" : "endpoint2",
-    "api/v1/txs" : "endpoint3"
+    "/api/v1/tx" : "endpoint1",
+    "/api/v1/time" : "endpoint2",
+    "/api/v1/txs" : "endpoint3"
 }
 

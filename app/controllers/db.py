@@ -111,17 +111,6 @@ async def get_all_users():
         raise DATABASE_EXCEPTION
 
     
-
-async def get_all_api_keys():
-    try:
-        with Session(engine) as session:
-            api_keys = session.query(ApiKey).all()
-            return api_keys
-    
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
-
 async def get_user_by_data(data : UserinDB):
     try:
         with Session(engine) as session:
@@ -222,8 +211,9 @@ async def get_credit_for_user(id : int):
 async def get_endpoint_credit_for_user(id : int, endpoint : str):
     try:
         with Session(engine) as session:
-            user = await get_user_by_id(id)
-            return getattr(user.credit_tracking, endpoint)
+            user = session.query(User).filter_by(id=id).first()
+            credit = getattr(user.credit_tracking, endpoint)
+            return credit 
     
     except Exception as e:
         print(e)
@@ -233,7 +223,7 @@ async def get_endpoint_credit_for_user(id : int, endpoint : str):
 async def decrement_endpoint_credit_for_user(id : int, endpoint :str):
     try:
         with Session(engine) as session:
-            user = await get_user_by_id(id)
+            user = session.query(User).filter_by(id=id).first()
             credit = user.credit_tracking
             new_value = getattr(credit, endpoint) - 1
             setattr(credit, endpoint, new_value)

@@ -333,11 +333,20 @@ async def reverse_proxy(request: Request):
 
         
         if (id):
+            path = request.url.path
             try:
-               
-                client = request.app.state.client
-                url = httpx.URL(path=request.url.path, query=request.url.query.encode('utf-8'))
+                endpoint_in_db = KUBER_ENDPOINTS_IN_DB[path]
+            except KeyError:
+                raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
 
+            if await get_endpoint_credit_for_user(id, endpoint_in_db) < 98:
+                raise CREDIT_FINISHED_EXCEPTION
+            
+            await decrement_endpoint_credit_for_user(id, endpoint_in_db)
+               
+            try:
+                client = request.app.state.client
+                url = httpx.URL(path=path, query=request.url.query.encode('utf-8'))
                 req = client.build_request(
                     request.method, url, headers=request.headers.raw, content=request.stream()
                 )
@@ -349,9 +358,7 @@ async def reverse_proxy(request: Request):
                     background=BackgroundTask(r.aclose)
                 )
             
-            except KeyError:
-                raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
-        
+            
             except Exception as e:
                 print(e)
                 raise KUBER_EXCEPTION
@@ -360,11 +367,21 @@ async def reverse_proxy(request: Request):
             raise CREDENTIALS_EXCEPTION
         
 
-    except COOKIE_EXCEPTION or CREDENTIALS_EXCEPTION or KUBER_EXCEPTION or ENDPOINT_DOES_NOT_EXIST_EXCEPTION or CREDIT_FINISHED_EXCEPTION as e:
-        raise HTTPException(
-        status_code=e.status_code,
-        detail=e.detail,
-    )
+    except COOKIE_EXCEPTION:
+        raise COOKIE_EXCEPTION
+    
+    except CREDENTIALS_EXCEPTION:
+        raise CREDENTIALS_EXCEPTION
+    
+    except KUBER_EXCEPTION:
+        raise KUBER_EXCEPTION
+    
+    except ENDPOINT_DOES_NOT_EXIST_EXCEPTION:
+        raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
+    
+
+    except CREDIT_FINISHED_EXCEPTION:
+        raise CREDIT_FINISHED_EXCEPTION
 
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
