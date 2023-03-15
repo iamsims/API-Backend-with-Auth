@@ -339,7 +339,7 @@ async def reverse_proxy(request: Request):
             except KeyError:
                 raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
 
-            if await get_endpoint_credit_for_user(id, endpoint_in_db) < 98:
+            if await get_endpoint_credit_for_user(id, endpoint_in_db) < 1:
                 raise CREDIT_FINISHED_EXCEPTION
             
             await decrement_endpoint_credit_for_user(id, endpoint_in_db)
