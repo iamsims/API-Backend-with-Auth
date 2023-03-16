@@ -43,10 +43,10 @@ class ENDPOINT_DOES_NOT_EXIST_EXCEPTION(HTTPException):
 
 
 
-class CREDIT_FINISHED_EXCEPTION(HTTPException):
+class CREDIT_NOT_ENOUGH_EXCEPTION(HTTPException):
     def __init__(self):
         self.status_code = status.HTTP_400_BAD_REQUEST
-        self.detail = "You have finished your credit for this endpoint"
+        self.detail = "You don't have enough credit to perform this request"
         super().__init__(status_code=self.status_code, detail=self.detail)
 
 class ALREADY_REGISTERED_EXCEPTION(HTTPException):

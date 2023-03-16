@@ -16,21 +16,21 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from decouple import config
 from app.auth.api_key import generate_api_key
 
-from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_FINISHED_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
+from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_NOT_ENOUGH_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 # from app.constants.exceptions import PROVIDER_EXCEPTION, MyException
 from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_token
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
 
-from app.controllers.db import add_api_key, add_user, decrement_endpoint_credit_for_user, get_api_keys, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id, get_credit_for_user, add_credit_for_user, get_endpoint_credit_for_user
+from app.controllers.db import add_api_key, add_user, decrement_endpoint_credit_for_user, get_api_keys, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id, get_credit_for_user, add_credit_for_user
 
 from app.models.users import UserinDB, UserLoginSchema
 
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
-from app.models.db import KUBER_ENDPOINTS_IN_DB
+from app.models.db import KUBER_ENDPOINTS_COST
 from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
 
 
@@ -71,13 +71,8 @@ async def login(request: Request):
     
 async def initialize_user(data):
     id = await add_user(data)
-    initial_credit = {
-        "endpoint1" : 100,
-        "endpoint2" : 100,
-        "endpoint3" : 100,
-    }
+    initial_credit = 1000
     await add_credit_for_user(id, initial_credit)
-    # await add_credit_for_user(id, 1000)
     return id 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
@@ -335,14 +330,14 @@ async def reverse_proxy(request: Request):
         if (id):
             path = request.url.path
             try:
-                endpoint_in_db = KUBER_ENDPOINTS_IN_DB[path]
+                cost = KUBER_ENDPOINTS_COST[path]
             except KeyError:
                 raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
 
-            if await get_endpoint_credit_for_user(id, endpoint_in_db) < 1:
-                raise CREDIT_FINISHED_EXCEPTION
+            if await get_credit_for_user(id) < cost:
+                raise CREDIT_NOT_ENOUGH_EXCEPTION
             
-            await decrement_endpoint_credit_for_user(id, endpoint_in_db)
+            await decrement_endpoint_credit_for_user(id, cost)
                
             try:
                 client = request.app.state.client
@@ -380,8 +375,8 @@ async def reverse_proxy(request: Request):
         raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
     
 
-    except CREDIT_FINISHED_EXCEPTION:
-        raise CREDIT_FINISHED_EXCEPTION
+    except CREDIT_NOT_ENOUGH_EXCEPTION:
+        raise CREDIT_NOT_ENOUGH_EXCEPTION
 
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
