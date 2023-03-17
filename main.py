@@ -6,16 +6,16 @@ from decouple import config
 import httpx
 
 
-SECRET_KEY = config('SECRET_KEY') or None
-if SECRET_KEY is None:
-    raise 'Missing SECRET_KEY'
+SESSION_SECRET_KEY = config('SESSION_SECRET_KEY') or None
+if SESSION_SECRET_KEY is None:
+    raise 'Missing SESSION_SECRET_KEY'
 
 KUBER_SERVER = config('KUBER_SERVER') or None
 if KUBER_SERVER is None:
     raise 'Missing KUBER_SERVER'
 
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 
 app.include_router(users_router)
 
