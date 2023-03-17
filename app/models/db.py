@@ -9,26 +9,6 @@ class Base(DeclarativeBase):
    pass
 
 
-class LogEntry(Base):
-    __tablename__ = 'logs'
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    start_time = Column(Integer)
-    duration = Column(Integer)
-    ip_address = Column(String)
-    status_code = Column(Integer)
-    request_headers = Column(LargeBinary)
-    response_headers = Column(LargeBinary)
-    request_body = Column(LargeBinary)
-    method = Column(String)
-    endpoint = Column(String)
-    cost = Column(Float)
-    
-    def __repr__(self) -> str:
-        return f"LogEntry( id= {self.id} start_time = {self.start_time}, duration={self.duration!r}, ip_address = {self.ip_address}, status_code = {self.status_code})"
-
-
-
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
