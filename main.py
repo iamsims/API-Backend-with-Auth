@@ -1,9 +1,12 @@
+import sys
 from fastapi import FastAPI, HTTPException
 from app.api.users_api import router as users_router
 
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
 import httpx
+
+from app.controllers.db import startup_db
 
 
 SESSION_SECRET_KEY = config('SESSION_SECRET_KEY') or None
@@ -21,6 +24,14 @@ app.include_router(users_router)
 
 @app.on_event('startup')
 async def startup_event():
+    try:
+        engine = startup_db()
+        app.state.engine = engine
+
+    except Exception as e:
+        print("Error during startup")
+        sys.exit(1)
+    
     client = httpx.AsyncClient(base_url=KUBER_SERVER)  # this is the other server
     app.state.client = client
 
@@ -29,4 +40,5 @@ async def startup_event():
 async def shutdown_event():
     client = app.state.client
     await client.aclose()
+
 

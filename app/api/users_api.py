@@ -16,6 +16,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from decouple import config
 from app.auth.api_key import generate_api_key
 
+
 from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_NOT_ENOUGH_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 # from app.constants.exceptions import PROVIDER_EXCEPTION, MyException
@@ -69,23 +70,24 @@ async def login(request: Request):
         detail="Exception in login"
         )
     
-async def initialize_user(data):
-    id = await add_user(data)
+async def initialize_user(engine, data):
+    id = await add_user(engine, data)
     initial_credit = 1000
-    await add_credit_for_user(id, initial_credit)
+    await add_credit_for_user(engine, id, initial_credit)
     return id 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup(form : OAuth2PasswordRequestForm = Depends()):
+async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
+    engine = request.app.state.engine
     try:
         hashed_password = get_password_hash(form.password)
         data = UserinDB(**{"identifier": form.username, "provider": "password", "hashed_pw": hashed_password})
         
-        user_exists = await users_exists_by_data(data)
+        user_exists = await users_exists_by_data(engine, data)
         if user_exists:
             raise ALREADY_REGISTERED_EXCEPTION
         
-        id = await initialize_user(data)
+        id = await initialize_user(engine, data)
         
         access_token = create_access_token(
             data={"id": id},
@@ -111,13 +113,14 @@ async def signup(form : OAuth2PasswordRequestForm = Depends()):
 
 
 @router.post("/token", status_code=status.HTTP_200_OK)
-async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(request:Request, form : OAuth2PasswordRequestForm = Depends()):
+    engine = request.app.state.engine
     try:
         data = UserinDB(**{"identifier": form.username, "provider": "password"})
-        user_exists = await users_exists_by_data(data)
+        user_exists = await users_exists_by_data(engine, data)
         if not user_exists:
             raise INCORRECT_USERNAME_EXCEPTION
-        user_in_db = await get_user_by_data(data)
+        user_in_db = await get_user_by_data(engine, data)
 
         print(user_in_db, "user_in_db")
 
@@ -152,6 +155,7 @@ async def login_for_access_token(form : OAuth2PasswordRequestForm = Depends()):
 
 @router.get('/token/{provider}')
 async def token(request: Request, response: Response):
+    engine = request.app.state.engine
     try:
         provider = request.path_params['provider']
         match provider:
@@ -180,13 +184,12 @@ async def token(request: Request, response: Response):
             case _:
                 raise PROVIDER_EXCEPTION
             
-        user_exists = await users_exists_by_data(data) 
+        user_exists = await users_exists_by_data(engine, data) 
         if not user_exists:
-            id = await initialize_user(data)
+            id = await initialize_user(engine, data)
         else:
-            id = await get_user_id_by_data(data)
+            id = await get_user_id_by_data(engine, data)
 
-    
         local_token = create_access_token(data={"id": id})
         response = JSONResponse(content={"result": True}, status_code=200)
         response.set_cookie(key="access_token", value=local_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
@@ -206,17 +209,18 @@ async def token(request: Request, response: Response):
         detail="Exception in obtaining token"
         )
 
-async def get_current_user_token(access_token: Union[str, None] = Cookie(None)):
+async def get_current_user_token(request:Request, access_token: Union[str, None] = Cookie(None)):
     if access_token is None:
         raise COOKIE_EXCEPTION
-    _ = await get_current_user_id(access_token)
+    _ = await get_current_user_id(request, access_token)
     return access_token
 
-async def get_current_user_id(access_token: Union[str, None] = Cookie(None)):
+async def get_current_user_id(request:Request, access_token: Union[str, None] = Cookie(None)):
+    engine = request.app.state.engine
     if access_token is None:
         raise COOKIE_EXCEPTION
 
-    if await is_token_blacklisted(access_token):
+    if await is_token_blacklisted(engine, access_token):
         print("Token is blacklisted")
         raise CREDENTIALS_EXCEPTION
     
@@ -227,7 +231,7 @@ async def get_current_user_id(access_token: Union[str, None] = Cookie(None)):
         print("id could not be extracted")
         raise CREDENTIALS_EXCEPTION
     
-    user_exists = await users_exists_by_id(id)
+    user_exists = await users_exists_by_id(engine, id)
     if user_exists:
         return id 
     
@@ -235,9 +239,10 @@ async def get_current_user_id(access_token: Union[str, None] = Cookie(None)):
 
 
 @router.get('/logout')
-async def logout(token: str = Depends(get_current_user_token)):
+async def logout(request:Request, token: str = Depends(get_current_user_token)):
+    engine = request.app.state.engine
     try :
-        await add_blacklist_token(token)
+        await add_blacklist_token(engine, token)
         return JSONResponse(content={"result": True}, status_code=200)
     
     except DATABASE_EXCEPTION:
@@ -252,9 +257,10 @@ async def logout(token: str = Depends(get_current_user_token)):
 
 
 @router.get('/get_api_keys')
-async def api_keys(id:int = Depends(get_current_user_id)):
+async def api_keys(request : Request, id:int = Depends(get_current_user_id)):
+    engine = request.app.state.engine
     try:
-        api_keys = await get_api_keys(id)
+        api_keys = await get_api_keys(engine, id)
         return api_keys
     
     except DATABASE_EXCEPTION:
@@ -268,10 +274,11 @@ async def api_keys(id:int = Depends(get_current_user_id)):
         )
 
 @router.get("/generate_api_key")
-async def api_key(id :int = Depends(get_current_user_id)):
+async def api_key(request: Request, id :int = Depends(get_current_user_id)):
+    engine = request.app.state.engine
     try:
         api_key = generate_api_key()
-        await add_api_key(id, api_key)
+        await add_api_key(engine, id, api_key)
         return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
     
     except DATABASE_EXCEPTION:
@@ -285,9 +292,11 @@ async def api_key(id :int = Depends(get_current_user_id)):
         )
 
 @router.get('/user_profile')
-async def get_user_profile(id :int = Depends(get_current_user_id)):
+async def get_user_profile(request:Request, id :int = Depends(get_current_user_id)):
+    engine = request.app.state.engine
+
     try:
-        data =await get_user_by_id(id)
+        data =await get_user_by_id(engine, id)
         profile = {
             "identifier": data.identifier,
             "provider": data.provider,
@@ -318,13 +327,14 @@ async def get_user_profile(id :int = Depends(get_current_user_id)):
 
 @router.route('/{endpoint:path}', methods=['GET', 'POST'])
 async def reverse_proxy(request: Request):
+    engine = request.app.state.engine
     try:
         if request.cookies.get('access_token'):
             token = request.cookies.get('access_token')
         else:
             raise COOKIE_EXCEPTION
     
-        id = await get_current_user_id(token)
+        id = await get_current_user_id(request, token)
 
         
         if (id):
@@ -334,10 +344,10 @@ async def reverse_proxy(request: Request):
             except KeyError:
                 raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
 
-            if await get_credit_for_user(id) < cost:
+            if await get_credit_for_user(engine, id) < cost:
                 raise CREDIT_NOT_ENOUGH_EXCEPTION
             
-            await decrement_endpoint_credit_for_user(id, cost)
+            await decrement_endpoint_credit_for_user(engine, id, cost)
                
             try:
                 client = request.app.state.client

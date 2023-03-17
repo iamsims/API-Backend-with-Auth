@@ -36,24 +36,26 @@ url_object = URL.create(
 )
 
 
-try:
-    engine = create_engine(url_object, pool_pre_ping=True)
-    Base.metadata.create_all(engine)
+def startup_db():
+    try:
+        engine = create_engine(url_object, pool_pre_ping=True)
+        Base.metadata.create_all(engine)
+        return engine 
+    
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e :
+        print(e)
+        raise DATABASE_EXCEPTION
 
-except OperationalError as error:
-    print(f"DB server is down")
-    raise DATABASE_DOWN_EXCEPTION
 
-except Exception as e :
-    print(e)
-    raise DATABASE_EXCEPTION
-
-
-async def add_api_key(id : int, api_key : str):
+async def add_api_key(engine , id : int, api_key : str):
     try:
         with Session(engine) as session:
             # todo check if i can insert user directly without actually inserting it
-            user = await get_user_by_id(id) 
+            user = await get_user_by_id(engine, id) 
             expiration_date = datetime.datetime.now() + datetime.timedelta(days=30)
             api_key = ApiKey(key=api_key, user=user, expiration_date=expiration_date, user_id=id)
             session.add(api_key)
@@ -68,7 +70,7 @@ async def add_api_key(id : int, api_key : str):
         raise DATABASE_EXCEPTION
 
 
-async def get_api_keys(id : int):
+async def get_api_keys(engine, id : int):
     try:
         with Session(engine) as session:
             user = session.query(User).filter_by(id=id).first()
@@ -96,7 +98,7 @@ async def get_api_keys(id : int):
 
 
 
-async def add_user(data : UserinDB):
+async def add_user(engine, data : UserinDB):
     try:
         with Session(engine) as session:
             user = User(identifier=data.identifier, email=data.email, hashed_pw=data.hashed_pw, provider_id=data.provider_id, provider=data.provider)
@@ -113,7 +115,7 @@ async def add_user(data : UserinDB):
         raise DATABASE_EXCEPTION
 
 
-async def get_user_id_by_data(data : UserinDB):
+async def get_user_id_by_data(engine, data : UserinDB):
     try:
         with Session(engine) as session:
             user = session.query(User).filter_by(identifier=data.identifier, provider=data.provider).first()
@@ -128,7 +130,7 @@ async def get_user_id_by_data(data : UserinDB):
         raise DATABASE_EXCEPTION
     
 
-async def get_all_users():
+async def get_all_users(engine):
     try:
         with Session(engine) as session:
             users = session.query(User).all()
@@ -143,7 +145,7 @@ async def get_all_users():
         raise DATABASE_EXCEPTION
 
     
-async def get_user_by_data(data : UserinDB):
+async def get_user_by_data(engine, data : UserinDB):
     try:
         with Session(engine) as session:
             user = session.query(User).filter_by(identifier=data.identifier, provider=data.provider).first()
@@ -160,9 +162,9 @@ async def get_user_by_data(data : UserinDB):
 
 
 
-async def users_exists_by_id(id : int):
+async def users_exists_by_id(engine, id : int):
     try:
-        user = await get_user_by_id(id)
+        user = await get_user_by_id(engine, id)
         if user:
             return True
         return False
@@ -174,7 +176,7 @@ async def users_exists_by_id(id : int):
         print(e)
         raise DATABASE_EXCEPTION
 
-async def get_user_by_id(id : int):
+async def get_user_by_id(engine, id : int):
     try:
         with Session(engine) as session:
             user = session.query(User).filter_by(id=id).first()
@@ -188,9 +190,9 @@ async def get_user_by_id(id : int):
         print(e)
         raise DATABASE_EXCEPTION
     
-async def users_exists_by_data(data : UserinDB):
+async def users_exists_by_data(engine, data : UserinDB):
     try:
-        user = await get_user_by_data(data)
+        user = await get_user_by_data(engine, data)
         if user:
             return True
         return False
@@ -204,7 +206,7 @@ async def users_exists_by_data(data : UserinDB):
         raise DATABASE_EXCEPTION
 
 
-async def add_blacklist_token(id : int):
+async def add_blacklist_token(engine, id : int):
     try:
         with Session(engine) as session:
             token = Blacklist(token = id)
@@ -220,7 +222,7 @@ async def add_blacklist_token(id : int):
         raise DATABASE_EXCEPTION
 
 
-async def is_token_blacklisted(id : int):
+async def is_token_blacklisted(engine, id : int):
     try:
         with Session(engine) as session:
             token = session.query(Blacklist).filter_by(token=id).first()
@@ -238,7 +240,7 @@ async def is_token_blacklisted(id : int):
         raise DATABASE_EXCEPTION
     
 
-async def add_credit_for_user(id : int, credit :int):
+async def add_credit_for_user(engine, id : int, credit :int):
     try:
         with Session(engine) as session:
             credit_entry = CreditTracking (user_id=id, credit=credit)
@@ -255,7 +257,7 @@ async def add_credit_for_user(id : int, credit :int):
         raise DATABASE_EXCEPTION
 
 
-async def get_credit_for_user(id : int):
+async def get_credit_for_user(engine, id : int):
     try:
         with Session(engine) as session:
             credit_entry = session.query(CreditTracking).filter_by(user_id=id).first()
@@ -271,7 +273,7 @@ async def get_credit_for_user(id : int):
         raise DATABASE_EXCEPTION
     
 
-async def decrement_endpoint_credit_for_user(id : int, cost :int):
+async def decrement_endpoint_credit_for_user(engine, id : int, cost :int):
     try:
         with Session(engine) as session:
             credit_entry = session.query(CreditTracking).filter_by(user_id=id).first()
