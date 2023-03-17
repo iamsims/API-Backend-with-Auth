@@ -64,6 +64,13 @@ class DATABASE_EXCEPTION(HTTPException):
         super().__init__(status_code=self.status_code, detail=self.detail)
 
 
+class DATABASE_DOWN_EXCEPTION(HTTPException):
+    def __init__(self):
+        self.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        self.detail = "DB server is down"
+        super().__init__(status_code=self.status_code, detail=self.detail)
+
+
 
 class KUBER_EXCEPTION(HTTPException):
     def __init__(self):

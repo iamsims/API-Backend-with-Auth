@@ -1,7 +1,8 @@
 import datetime
+import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from app.constants.exceptions import DATABASE_EXCEPTION
+from app.constants.exceptions import DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION
 from app.models.db import Base, Blacklist, CreditTracking, User, ApiKey
 from sqlalchemy import URL
 from decouple import config
@@ -34,12 +35,17 @@ url_object = URL.create(
     database=DB_NAME,
 )
 
+
 try:
     engine = create_engine(url_object, pool_pre_ping=True)
     Base.metadata.create_all(engine)
 
 except OperationalError as error:
-    print(f"Error connecting to the database: {error}")
+    print(f"DB server is down")
+    raise DATABASE_DOWN_EXCEPTION
+
+except Exception as e :
+    print(e)
     raise DATABASE_EXCEPTION
 
 
@@ -52,6 +58,10 @@ async def add_api_key(id : int, api_key : str):
             api_key = ApiKey(key=api_key, user=user, expiration_date=expiration_date, user_id=id)
             session.add(api_key)
             session.commit()
+
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
 
     except Exception as e :
         print(e)
@@ -74,8 +84,12 @@ async def get_api_keys(id : int):
                     api_keys.append(key)
 
             return api_keys
+        
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
 
-    
+ 
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -90,6 +104,9 @@ async def add_user(data : UserinDB):
             session.commit()
             session.refresh(user)
             return user.id
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
 
     except Exception as e :
         print(e)
@@ -101,7 +118,11 @@ async def get_user_id_by_data(data : UserinDB):
         with Session(engine) as session:
             user = session.query(User).filter_by(identifier=data.identifier, provider=data.provider).first()
             return user.id
-    
+
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -112,7 +133,11 @@ async def get_all_users():
         with Session(engine) as session:
             users = session.query(User).all()
             return users
-    
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
+
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -123,7 +148,12 @@ async def get_user_by_data(data : UserinDB):
         with Session(engine) as session:
             user = session.query(User).filter_by(identifier=data.identifier, provider=data.provider).first()
             return user
-    
+        
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
+
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -136,7 +166,10 @@ async def users_exists_by_id(id : int):
         if user:
             return True
         return False
-    
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -146,7 +179,11 @@ async def get_user_by_id(id : int):
         with Session(engine) as session:
             user = session.query(User).filter_by(id=id).first()
             return user
-    
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
+
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -157,7 +194,11 @@ async def users_exists_by_data(data : UserinDB):
         if user:
             return True
         return False
-    
+
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -169,6 +210,10 @@ async def add_blacklist_token(id : int):
             token = Blacklist(token = id)
             session.add(token)
             session.commit()
+
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
 
     except Exception as e :
         print(e)
@@ -182,7 +227,12 @@ async def is_token_blacklisted(id : int):
             if token:
                 return True
             return False
-        
+
+    except OperationalError as error:
+        print(f"DB server is down ")
+        raise DATABASE_DOWN_EXCEPTION
+
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -194,7 +244,12 @@ async def add_credit_for_user(id : int, credit :int):
             credit_entry = CreditTracking (user_id=id, credit=credit)
             session.add(credit_entry)
             session.commit()
-    
+
+    except OperationalError as error:
+        print(f"DB server is down ")
+        raise DATABASE_DOWN_EXCEPTION
+
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
@@ -205,7 +260,12 @@ async def get_credit_for_user(id : int):
         with Session(engine) as session:
             credit_entry = session.query(CreditTracking).filter_by(user_id=id).first()
             return credit_entry.credit
-    
+
+    except OperationalError as error:
+        print(f"DB server is down ")
+        raise DATABASE_DOWN_EXCEPTION
+
+
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION
@@ -217,7 +277,11 @@ async def decrement_endpoint_credit_for_user(id : int, cost :int):
             credit_entry = session.query(CreditTracking).filter_by(user_id=id).first()
             credit_entry.credit -= cost
             session.commit()
-   
+
+    except OperationalError as error:
+        print(f"DB server is down")
+        raise DATABASE_DOWN_EXCEPTION
+
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
