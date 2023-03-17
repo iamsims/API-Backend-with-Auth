@@ -5,6 +5,7 @@ from app.constants.exceptions import DATABASE_EXCEPTION
 from app.models.db import Base, Blacklist, CreditTracking, User, ApiKey
 from sqlalchemy import URL
 from decouple import config
+from sqlalchemy.exc import OperationalError
 
 from app.models.users import UserinDB
 
@@ -33,8 +34,13 @@ url_object = URL.create(
     database=DB_NAME,
 )
 
-engine = create_engine(url_object)
-Base.metadata.create_all(engine)
+try:
+    engine = create_engine(url_object, pool_pre_ping=True)
+    Base.metadata.create_all(engine)
+
+except OperationalError as error:
+    print(f"Error connecting to the database: {error}")
+    raise DATABASE_EXCEPTION
 
 
 async def add_api_key(id : int, api_key : str):
