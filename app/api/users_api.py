@@ -17,7 +17,7 @@ from decouple import config
 from app.auth.api_key import generate_api_key
 
 
-from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_NOT_ENOUGH_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
+from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_NOT_ENOUGH_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 # from app.constants.exceptions import PROVIDER_EXCEPTION, MyException
 from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_token
@@ -43,13 +43,13 @@ if KUBER_SERVER is None:
 router = APIRouter()
 
 
-@router.get('/login/{provider}')
-async def login(request: Request):
-    provider = request.path_params['provider']
+@router.get('/auth/sso/login/{provider}')
+async def login(provider: str, request: Request):
     try:
         match provider:
             case "google":
-                redirect_uri = request.url_for('token', provider= "google")  # This creates the url for the /auth endpoint
+                base_url = request.base_url
+                redirect_uri = f"{base_url}auth/sso/callback/google"
                 return await oauth.google.authorize_redirect(request, redirect_uri)
     
             case "github":
@@ -62,6 +62,10 @@ async def login(request: Request):
             
     except PROVIDER_EXCEPTION:
         raise PROVIDER_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+   
 
     except Exception as e:
         print(e)
@@ -70,90 +74,9 @@ async def login(request: Request):
         detail="Exception in login"
         )
     
-async def initialize_user(engine, data):
-    id = await add_user(engine, data)
-    initial_credit = 1000
-    await add_credit_for_user(engine, id, initial_credit)
-    return id 
-
-@router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
-    engine = request.app.state.engine
-    try:
-        hashed_password = get_password_hash(form.password)
-        data = UserinDB(**{"identifier": form.username, "provider": "password", "hashed_pw": hashed_password})
-        
-        user_exists = await users_exists_by_data(engine, data)
-        if user_exists:
-            raise ALREADY_REGISTERED_EXCEPTION
-        
-        id = await initialize_user(engine, data)
-        
-        access_token = create_access_token(
-            data={"id": id},
-        )
-
-        print(id)
-        response = JSONResponse(content={"result": True}, status_code=200)
-        response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
-        return response
-    
-    except ALREADY_REGISTERED_EXCEPTION:
-        raise ALREADY_REGISTERED_EXCEPTION
-    
-    except DATABASE_EXCEPTION:
-        raise DATABASE_EXCEPTION
-
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in signup"
-        )
 
 
-@router.post("/token", status_code=status.HTTP_200_OK)
-async def login_for_access_token(request:Request, form : OAuth2PasswordRequestForm = Depends()):
-    engine = request.app.state.engine
-    try:
-        data = UserinDB(**{"identifier": form.username, "provider": "password"})
-        user_exists = await users_exists_by_data(engine, data)
-        if not user_exists:
-            raise INCORRECT_USERNAME_EXCEPTION
-        user_in_db = await get_user_by_data(engine, data)
-
-        print(user_in_db, "user_in_db")
-
-        if not verify_password(form.password, user_in_db.hashed_pw):
-            raise INCORRECT_PASSWORD_EXCEPTION
-        access_token = create_access_token(
-            data={"id": user_in_db.id},
-        )
-        print(user_in_db.id)
-
-        response = JSONResponse(content={"result": True}, status_code=200)
-        response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
-        return response
-    
-    except INCORRECT_USERNAME_EXCEPTION:
-        raise INCORRECT_USERNAME_EXCEPTION
-    
-    except DATABASE_EXCEPTION:
-        raise DATABASE_EXCEPTION
-
-    except INCORRECT_PASSWORD_EXCEPTION:
-        raise INCORRECT_PASSWORD_EXCEPTION
-
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in login"
-        )
-
-
-
-@router.get('/token/{provider}')
+@router.get('/auth/sso/callback/{provider}')
 async def token(request: Request, response: Response):
     engine = request.app.state.engine
     try:
@@ -201,6 +124,10 @@ async def token(request: Request, response: Response):
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION:
+        raise DATABASE_DOWN_EXCEPTION
+   
 
     except Exception as e:
         print(e)
@@ -208,6 +135,96 @@ async def token(request: Request, response: Response):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in obtaining token"
         )
+
+    
+async def initialize_user(engine, data):
+    id = await add_user(engine, data)
+    initial_credit = 1000
+    await add_credit_for_user(engine, id, initial_credit)
+    return id 
+
+@router.post("/auth/signup", status_code=status.HTTP_201_CREATED)
+async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
+    engine = request.app.state.engine
+    try:
+        hashed_password = get_password_hash(form.password)
+        data = UserinDB(**{"identifier": form.username, "provider": "password", "hashed_pw": hashed_password})
+        
+        user_exists = await users_exists_by_data(engine, data)
+        if user_exists:
+            raise ALREADY_REGISTERED_EXCEPTION
+        
+        id = await initialize_user(engine, data)
+        
+        access_token = create_access_token(
+            data={"id": id},
+        )
+
+        print(id)
+        response = JSONResponse(content={"result": True}, status_code=200)
+        response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+        return response
+    
+    except ALREADY_REGISTERED_EXCEPTION:
+        raise ALREADY_REGISTERED_EXCEPTION
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+   
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in signup"
+        )
+
+
+@router.post("/auth/login", status_code=status.HTTP_200_OK)
+async def login_for_access_token(request:Request, form : OAuth2PasswordRequestForm = Depends()):
+    engine = request.app.state.engine
+    try:
+        data = UserinDB(**{"identifier": form.username, "provider": "password"})
+        user_exists = await users_exists_by_data(engine, data)
+        if not user_exists:
+            raise INCORRECT_USERNAME_EXCEPTION
+        user_in_db = await get_user_by_data(engine, data)
+
+        print(user_in_db, "user_in_db")
+
+        if not verify_password(form.password, user_in_db.hashed_pw):
+            raise INCORRECT_PASSWORD_EXCEPTION
+        access_token = create_access_token(
+            data={"id": user_in_db.id},
+        )
+        print(user_in_db.id)
+
+        response = JSONResponse(content={"result": True}, status_code=200)
+        response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+        return response
+    
+    except INCORRECT_USERNAME_EXCEPTION:
+        raise INCORRECT_USERNAME_EXCEPTION
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+   
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+   
+    except INCORRECT_PASSWORD_EXCEPTION:
+        raise INCORRECT_PASSWORD_EXCEPTION
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in login"
+        )
+
 
 async def get_current_user_token(request:Request, access_token: Union[str, None] = Cookie(None)):
     if access_token is None:
@@ -238,16 +255,21 @@ async def get_current_user_id(request:Request, access_token: Union[str, None] = 
     raise CREDENTIALS_EXCEPTION
 
 
-@router.get('/logout')
+@router.get('/auth/logout')
 async def logout(request:Request, token: str = Depends(get_current_user_token)):
     engine = request.app.state.engine
     try :
         await add_blacklist_token(engine, token)
-        return JSONResponse(content={"result": True}, status_code=200)
+        response = JSONResponse(content={"result": True}, status_code=200)
+        response.delete_cookie("access_token")
+        return response 
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
-    
+
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+       
     except Exception as e:
         print(e)
         raise HTTPException(
@@ -256,7 +278,7 @@ async def logout(request:Request, token: str = Depends(get_current_user_token)):
         )
 
 
-@router.get('/get_api_keys')
+@router.get('/api_keys')
 async def api_keys(request : Request, id:int = Depends(get_current_user_id)):
     engine = request.app.state.engine
     try:
@@ -265,7 +287,10 @@ async def api_keys(request : Request, id:int = Depends(get_current_user_id)):
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
-    
+   
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+       
     except Exception as e:
         print(e)
         raise HTTPException(
@@ -273,8 +298,8 @@ async def api_keys(request : Request, id:int = Depends(get_current_user_id)):
         detail="Exception in getting api keys"
         )
 
-@router.get("/generate_api_key")
-async def api_key(request: Request, id :int = Depends(get_current_user_id)):
+@router.post("/api-keys/generate")
+async def api_key(request: Request, id :int = Depends(get_current_user_id) ):
     engine = request.app.state.engine
     try:
         api_key = generate_api_key()
@@ -284,6 +309,9 @@ async def api_key(request: Request, id :int = Depends(get_current_user_id)):
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
 
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+    
     except Exception as e:
         print(e)
         raise HTTPException(
@@ -291,7 +319,7 @@ async def api_key(request: Request, id :int = Depends(get_current_user_id)):
         detail="Exception in generating api key"
         )
 
-@router.get('/user_profile')
+@router.get('/auth/profile')
 async def get_user_profile(request:Request, id :int = Depends(get_current_user_id)):
     engine = request.app.state.engine
 
@@ -308,12 +336,38 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
     
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+    
+    
     except Exception as e:
         print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in getting user profile"
         )
+    
+
+@router.get("/credit")
+async def get_credit(request : Request, id: int = Depends(get_current_user_id)):
+    engine = request.app.state.engine
+    try:
+        credit = await get_credit_for_user(engine, id)
+        return credit
+    
+    except DATABASE_EXCEPTION :
+        raise DATABASE_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION:
+        raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in getting user credit"
+        )
+
 
 # @router.get("/testall")
 # async def testall():

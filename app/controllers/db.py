@@ -36,7 +36,7 @@ url_object = URL.create(
 )
 
 
-def startup_db():
+async def startup_db():
     try:
         engine = create_engine(url_object, pool_pre_ping=True)
         Base.metadata.create_all(engine)
