@@ -24,7 +24,7 @@ from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
 
-from app.controllers.db import add_api_key, add_user, decrement_endpoint_credit_for_user, get_api_keys, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id, get_credit_for_user, add_credit_for_user
+from app.controllers.db import add_api_key, add_user, decrement_endpoint_credit_for_user, get_api_keys, get_logs, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id, get_credit_for_user, add_credit_for_user
 
 from app.models.users import UserinDB, UserLoginSchema
 
@@ -354,6 +354,28 @@ async def get_credit(request : Request, id: int = Depends(get_current_user_id)):
     try:
         credit = await get_credit_for_user(engine, id)
         return credit
+    
+    except DATABASE_EXCEPTION :
+        raise DATABASE_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION:
+        raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in getting user credit"
+        )
+
+
+@router.get("/credit/usage")
+async def get_credit_usage(request : Request, page: int = 1, page_size: int = 10, id: int = Depends(get_current_user_id)):
+    engine = request.app.state.engine
+    try:
+        paginated_logs = await get_logs(engine, id , page, page_size)
+        return paginated_logs
+
     
     except DATABASE_EXCEPTION :
         raise DATABASE_EXCEPTION

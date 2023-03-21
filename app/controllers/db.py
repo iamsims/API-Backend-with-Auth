@@ -1,9 +1,10 @@
 import datetime
+import math
 import sys
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session
 from app.constants.exceptions import DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION
-from app.models.db import Base, Blacklist, CreditTracking, User, ApiKey
+from app.models.db import Base, Blacklist, CreditTracking, LogEntry, User, ApiKey
 from sqlalchemy import URL
 from decouple import config
 from sqlalchemy.exc import OperationalError
@@ -205,6 +206,48 @@ async def users_exists_by_data(engine, data : UserinDB):
         print(e)
         raise DATABASE_EXCEPTION
 
+
+async def get_logs(engine, user_id: str, page: int = 1, page_size: int = 10):
+    try:
+        with Session(engine) as session:
+            logs = session.query(LogEntry).filter_by(user_id=user_id).order_by(LogEntry.start_time.asc()).offset((page - 1) * page_size).limit(page_size).all()
+            count = session.query(func.count(LogEntry.id)).filter_by(user_id=user_id).scalar()
+
+            result = []
+            for log in logs:
+                log.request_headers = None
+                log.response_headers = None
+                result.append(log)
+
+            total_size = math.ceil(count / page_size)
+
+            return {
+                "logs": result,       
+                "total_pages": total_size, 
+                "page": page,
+                "page_size": page_size
+            }
+
+           
+    except OperationalError as error:
+        print(f"DB server is down ")
+        raise DATABASE_DOWN_EXCEPTION
+
+    except Exception as e :
+        print(e)
+        raise DATABASE_EXCEPTION
+    logs = (
+        db.query(LogEntry)
+        .filter(LogEntry.user_id == user_id)
+        .paginate(page, page_size, False)
+        .items
+    )
+    total_logs = db.query(LogEntry).filter(LogEntry.user_id == user_id).count()
+
+    return {
+        "logs": logs,
+        "total": len(logs),
+    }
 
 async def add_blacklist_token(engine, id : int):
     try:
