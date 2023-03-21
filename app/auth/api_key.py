@@ -1,10 +1,12 @@
 from fastapi import HTTPException, status
 import secrets
+import base64
 
     
 def generate_api_key():
     try:
-        api_key = secrets.token_hex(16) 
+        random_bytes = secrets.token_bytes(48)
+        api_key = base64.b64encode(random_bytes).decode('utf-8')
         return api_key
     except:
         raise HTTPException(
