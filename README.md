@@ -3,8 +3,14 @@
 python3 -m venv fastapienv 
 source fastapienv/bin/activate 
 pip install -r requirements.txt 
+alembic upgrade head 
 uvicorn main:app --reload
 ```
+
+
+# Data Migration
+alembic revision --autogenerate -m "message"
+alembic upgrade head
 
 # API Documentation 
 
