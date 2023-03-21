@@ -25,7 +25,7 @@ app.include_router(users_router)
 @app.on_event('startup')
 async def startup_event():
     try:
-        engine = startup_db()
+        engine = await startup_db()
         app.state.engine = engine
 
     except Exception as e:
