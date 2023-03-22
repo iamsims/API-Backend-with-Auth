@@ -181,6 +181,8 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in signup"
         )
+    
+
 
 
 @router.post("/auth/login", status_code=status.HTTP_200_OK)
@@ -370,12 +372,12 @@ async def get_credit(request : Request, id: int = Depends(get_current_user_id)):
 
 
 @router.get("/credit/usage")
-async def get_credit_usage(request : Request, page: int = 1, page_size: int = 10, id: int = Depends(get_current_user_id)):
+async def get_credit_usage(request : Request, api_key : str = None, page: int = 1, page_size: int = 10, id: int = Depends(get_current_user_id)):
     engine = request.app.state.engine
     try:
-        paginated_logs = await get_logs(engine, id , page, page_size)
+        paginated_logs = await get_logs(engine, id , api_key, page, page_size)
         return paginated_logs
-
+        
     
     except DATABASE_EXCEPTION :
         raise DATABASE_EXCEPTION
@@ -389,6 +391,9 @@ async def get_credit_usage(request : Request, page: int = 1, page_size: int = 10
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in getting user credit"
         )
+    
+
+
 
 
 # @router.get("/testall")

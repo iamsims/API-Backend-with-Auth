@@ -207,18 +207,22 @@ async def users_exists_by_data(engine, data : UserinDB):
         raise DATABASE_EXCEPTION
 
 
-async def get_logs(engine, user_id: str, page: int = 1, page_size: int = 10):
+async def get_logs(engine, user_id: str, api_key : str =None, page: int = 1, page_size: int = 10):
     try:
         with Session(engine) as session:
-            logs = session.query(LogEntry).filter_by(user_id=user_id).order_by(LogEntry.start_time.asc()).offset((page - 1) * page_size).limit(page_size).all()
-            count = session.query(func.count(LogEntry.id)).filter_by(user_id=user_id).scalar()
+            if not api_key:
+                logs = session.query(LogEntry).filter_by(user_id=user_id).order_by(LogEntry.start_time.asc()).offset((page - 1) * page_size).limit(page_size).all()
+                count = session.query(func.count(LogEntry.id)).filter_by(user_id=user_id).scalar()  
+            else:
+                logs = session.query(LogEntry).filter_by(user_id=user_id, api_key=api_key).order_by(LogEntry.start_time.asc()).offset((page - 1) * page_size).limit(page_size).all()
+                count = session.query(func.count(LogEntry.id)).filter_by(user_id=user_id, api_key=api_key).scalar()
 
             result = []
             for log in logs:
                 log.request_headers = None
                 log.response_headers = None
                 result.append(log)
-
+            
             total_size = math.ceil(count / page_size)
 
             return {
@@ -227,7 +231,7 @@ async def get_logs(engine, user_id: str, page: int = 1, page_size: int = 10):
                 "page": page,
                 "page_size": page_size
             }
-
+            
            
     except OperationalError as error:
         print(f"DB server is down ")
