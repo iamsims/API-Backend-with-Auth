@@ -240,18 +240,7 @@ async def get_logs(engine, user_id: str, api_key : str =None, page: int = 1, pag
     except Exception as e :
         print(e)
         raise DATABASE_EXCEPTION
-    logs = (
-        db.query(LogEntry)
-        .filter(LogEntry.user_id == user_id)
-        .paginate(page, page_size, False)
-        .items
-    )
-    total_logs = db.query(LogEntry).filter(LogEntry.user_id == user_id).count()
-
-    return {
-        "logs": logs,
-        "total": len(logs),
-    }
+ 
 
 async def add_blacklist_token(engine, id : int):
     try:
