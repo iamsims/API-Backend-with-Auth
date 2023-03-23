@@ -21,8 +21,12 @@ COPY ./requirements.txt ./requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY ./alembic.ini ./alembic.ini
+COPY ./alembic ./alembic
+COPY ./entrypoint.sh ./entrypoint.sh
 COPY ./main.py ./main.py
 COPY ./app ./app
+
 # OK, now we pip install our requirements
 
 EXPOSE 8080
@@ -32,4 +36,4 @@ EXPOSE 8080
 # We could skip this part and then type
 # python -m uvicorn main.app:app ... below
 USER app
-CMD python3 -m uvicorn main:app --host 0.0.0.0 --port 8080
+CMD /server/entrypoint.sh 
