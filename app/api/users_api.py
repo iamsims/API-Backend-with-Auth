@@ -422,7 +422,8 @@ async def reverse_proxy(request: Request):
             path = request.url.path
             try:
                 cost = KUBER_ENDPOINTS_COST[path]
-            except KeyError:
+            except KeyError as e:
+                print(e.detail)
                 raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
 
             if await get_credit_for_user(engine, id) < cost:
@@ -446,34 +447,40 @@ async def reverse_proxy(request: Request):
             
             
             except Exception as e:
-                print(e)
+                print(e.detail)
                 raise KUBER_EXCEPTION
     
         else:
             raise CREDENTIALS_EXCEPTION
         
 
-    except COOKIE_EXCEPTION:
+    except COOKIE_EXCEPTION as e:
+        print(e.detail)
         raise COOKIE_EXCEPTION
     
-    except CREDENTIALS_EXCEPTION:
+    except CREDENTIALS_EXCEPTION as e:
+        print(e.detail)
         raise CREDENTIALS_EXCEPTION
     
-    except KUBER_EXCEPTION:
+    except KUBER_EXCEPTION as e:
+        print(e.detail)
         raise KUBER_EXCEPTION
     
-    except ENDPOINT_DOES_NOT_EXIST_EXCEPTION:
+    except ENDPOINT_DOES_NOT_EXIST_EXCEPTION as e:
+        print(e.detail)
         raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
     
 
-    except CREDIT_NOT_ENOUGH_EXCEPTION:
+    except CREDIT_NOT_ENOUGH_EXCEPTION as e:
+        print(e.detail)
         raise CREDIT_NOT_ENOUGH_EXCEPTION
 
-    except DATABASE_EXCEPTION:
+    except DATABASE_EXCEPTION as e:
+        print(e.detail)
         raise DATABASE_EXCEPTION
 
     except Exception as e:
-        print(e)
+        print(e.detail)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in reverse proxy"

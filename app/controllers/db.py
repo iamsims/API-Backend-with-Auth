@@ -12,44 +12,57 @@ from sqlalchemy.exc import OperationalError
 from app.models.users import UserinDB
 
 
+DB_DRIVER = config('DB_DRIVER') or None
+if DB_DRIVER is None:
+    raise 'Missing DB_DRIVER'
+
 DB_USERNAME = config('DB_USERNAME') or None
-if DB_USERNAME is None:
-    raise 'Missing DB_USERNAME'
-
 DB_PASSWORD = config('DB_PASSWORD') or None
-if DB_PASSWORD is None:
-    raise 'Missing DB_PASSWORD'
-
 DB_HOST = config('DB_HOST') or None
-if DB_HOST is None:
-    raise 'Missing DB_HOST'
-
 DB_NAME = config('DB_NAME') or None
-if DB_NAME is None:
-    raise 'Missing DB_NAME'
-
-url_object = URL.create(
-    "postgresql+psycopg2",
-    username=DB_USERNAME,
-    password=DB_PASSWORD,  # plain (unescaped) text
-    host=DB_HOST,
-    database=DB_NAME,
-)
 
 
-async def startup_db():
+if DB_DRIVER != "sqlite":
+    if DB_USERNAME is None:
+        raise 'Missing DB_USERNAME'
+
+    if DB_PASSWORD is None:
+        raise 'Missing DB_PASSWORD'
+
+    if DB_HOST is None:
+        raise 'Missing DB_HOST'
+
+    if DB_NAME is None:
+        raise 'Missing DB_NAME'
+
+
+def startup_db():
     try:
-        engine = create_engine(url_object, pool_pre_ping=True)
+        if DB_DRIVER == "sqlite":
+            url_object = 'sqlite:///db.sqlite'
+            
+
+        else:
+            url_object = URL.create(
+            drivername= DB_DRIVER,
+            username=DB_USERNAME,
+            password=DB_PASSWORD,  # plain (unescaped) text
+            host=DB_HOST,
+            database=DB_NAME,
+            )
+
+        engine = create_engine(url_object)
         Base.metadata.create_all(engine)
+
         return engine 
     
-    except OperationalError as error:
-        print(f"DB server is down")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
     
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 
 async def add_api_key(engine , id : int, api_key : str):
@@ -62,13 +75,13 @@ async def add_api_key(engine , id : int, api_key : str):
             session.add(api_key)
             session.commit()
 
-    except OperationalError as error:
-        print(f"DB server is down")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 
 async def get_api_keys(engine, id : int):
@@ -88,14 +101,13 @@ async def get_api_keys(engine, id : int):
 
             return api_keys
         
-    except OperationalError as error:
-        print(f"DB server is down")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
- 
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 
 
@@ -107,13 +119,14 @@ async def add_user(engine, data : UserinDB):
             session.commit()
             session.refresh(user)
             return user.id
-    except OperationalError as error:
-        print(f"DB server is down")
-        raise DATABASE_DOWN_EXCEPTION
 
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    except OperationalError as e:
+        print(e.detail)
+        raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 
 async def get_user_id_by_data(engine, data : UserinDB):
@@ -122,28 +135,28 @@ async def get_user_id_by_data(engine, data : UserinDB):
             user = session.query(User).filter_by(identifier=data.identifier, provider=data.provider).first()
             return user.id
 
-    except OperationalError as error:
-        print(f"DB server is down")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
     
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
+ 
 
 async def get_all_users(engine):
     try:
         with Session(engine) as session:
             users = session.query(User).all()
             return users
-    except OperationalError as error:
-        print(f"DB server is down")
+
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
     
 async def get_user_by_data(engine, data : UserinDB):
@@ -152,15 +165,13 @@ async def get_user_by_data(engine, data : UserinDB):
             user = session.query(User).filter_by(identifier=data.identifier, provider=data.provider).first()
             return user
         
-    except OperationalError as error:
-        print(f"DB server is down")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
-
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 
 async def users_exists_by_id(engine, id : int):
@@ -169,28 +180,29 @@ async def users_exists_by_id(engine, id : int):
         if user:
             return True
         return False
-    except OperationalError as error:
-        print(f"DB server is down")
+    
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 async def get_user_by_id(engine, id : int):
     try:
         with Session(engine) as session:
             user = session.query(User).filter_by(id=id).first()
             return user
-    except OperationalError as error:
-        print(f"DB server is down")
+        
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
     
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
+   
 async def users_exists_by_data(engine, data : UserinDB):
     try:
         user = await get_user_by_data(engine, data)
@@ -198,13 +210,13 @@ async def users_exists_by_data(engine, data : UserinDB):
             return True
         return False
 
-    except OperationalError as error:
-        print(f"DB server is down")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 
 async def get_logs(engine, user_id: str, api_key : str =None, page: int = 1, page_size: int = 10):
@@ -233,14 +245,14 @@ async def get_logs(engine, user_id: str, api_key : str =None, page: int = 1, pag
             }
             
            
-    except OperationalError as error:
-        print(f"DB server is down ")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
- 
 
 async def add_blacklist_token(engine, id : int):
     try:
@@ -249,13 +261,13 @@ async def add_blacklist_token(engine, id : int):
             session.add(token)
             session.commit()
 
-    except OperationalError as error:
-        print(f"DB server is down")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 
 async def is_token_blacklisted(engine, id : int):
@@ -266,15 +278,14 @@ async def is_token_blacklisted(engine, id : int):
                 return True
             return False
 
-    except OperationalError as error:
-        print(f"DB server is down ")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
     
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
+
 
 async def add_credit_for_user(engine, id : int, credit :int):
     try:
@@ -283,14 +294,13 @@ async def add_credit_for_user(engine, id : int, credit :int):
             session.add(credit_entry)
             session.commit()
 
-    except OperationalError as error:
-        print(f"DB server is down ")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
 
 
 async def get_credit_for_user(engine, id : int):
@@ -299,15 +309,14 @@ async def get_credit_for_user(engine, id : int):
             credit_entry = session.query(CreditTracking).filter_by(user_id=id).first()
             return credit_entry.credit
 
-    except OperationalError as error:
-        print(f"DB server is down ")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
     
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
+
 
 async def decrement_endpoint_credit_for_user(engine, id : int, cost :int):
     try:
@@ -316,10 +325,10 @@ async def decrement_endpoint_credit_for_user(engine, id : int, cost :int):
             credit_entry.credit -= cost
             session.commit()
 
-    except OperationalError as error:
-        print(f"DB server is down")
+    except OperationalError as e:
+        print(e.detail)
         raise DATABASE_DOWN_EXCEPTION
-
-    except Exception as e :
-        print(e)
-        raise DATABASE_EXCEPTION
+    
+    except Exception as e:
+        print(e.detail)
+        raise DATABASE_EXCEPTION    
