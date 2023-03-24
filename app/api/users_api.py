@@ -280,7 +280,7 @@ async def logout(request:Request, token: str = Depends(get_current_user_token)):
         )
 
 
-@router.get('/api_keys')
+@router.get('/api-keys')
 async def api_keys(request : Request, id:int = Depends(get_current_user_id)):
     engine = request.app.state.engine
     try:
