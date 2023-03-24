@@ -1,6 +1,10 @@
 import sys
 from fastapi import FastAPI, HTTPException
 from app.api.users_api import router as users_router
+from app.api.api_keys import router as api_keys_router
+from app.api.credit import router as credit_router
+from app.api.proxy import router as proxy_router
+
 
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
@@ -20,7 +24,10 @@ if KUBER_SERVER is None:
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 
-app.include_router(users_router)
+app.include_router(users_router, prefix= "/auth")
+app.include_router(api_keys_router, prefix = "/api")
+app.include_router(credit_router, prefix = "/credit")
+app.include_router(proxy_router)
 
 @app.on_event('startup')
 async def startup_event():

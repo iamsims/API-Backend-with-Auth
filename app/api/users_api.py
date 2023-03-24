@@ -35,15 +35,10 @@ from app.models.db import KUBER_ENDPOINTS_COST
 from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
 
 
-KUBER_SERVER = config('KUBER_SERVER') or None
-if KUBER_SERVER is None:
-    raise BaseException('Missing env variables for kuber server')
-
-
 router = APIRouter()
 
 
-@router.get('/auth/sso/login/{provider}')
+@router.get('/sso/login/{provider}')
 async def login(provider: str, request: Request):
     try:
         match provider:
@@ -76,7 +71,7 @@ async def login(provider: str, request: Request):
     
 
 
-@router.get('/auth/sso/callback/{provider}')
+@router.get('/sso/callback/{provider}')
 async def token(request: Request, response: Response):
     engine = request.app.state.engine
     try:
@@ -143,7 +138,7 @@ async def initialize_user(engine, data):
     await add_credit_for_user(engine, id, initial_credit)
     return id 
 
-@router.post("/auth/signup", status_code=status.HTTP_201_CREATED)
+@router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
     engine = request.app.state.engine
     try:
@@ -185,7 +180,7 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
 
 
 
-@router.post("/auth/login", status_code=status.HTTP_200_OK)
+@router.post("/login", status_code=status.HTTP_200_OK)
 async def login_for_access_token(request:Request, form : OAuth2PasswordRequestForm = Depends()):
     engine = request.app.state.engine
     try:
@@ -257,7 +252,7 @@ async def get_current_user_id(request:Request, access_token: Union[str, None] = 
     raise CREDENTIALS_EXCEPTION
 
 
-@router.get('/auth/logout')
+@router.get('/logout')
 async def logout(request:Request, token: str = Depends(get_current_user_token)):
     engine = request.app.state.engine
     try :
@@ -279,49 +274,7 @@ async def logout(request:Request, token: str = Depends(get_current_user_token)):
         detail="Exception in logout"
         )
 
-
-@router.get('/api-keys')
-async def api_keys(request : Request, id:int = Depends(get_current_user_id)):
-    engine = request.app.state.engine
-    try:
-        api_keys = await get_api_keys(engine, id)
-        return api_keys
-    
-    except DATABASE_EXCEPTION:
-        raise DATABASE_EXCEPTION
-   
-    except DATABASE_DOWN_EXCEPTION:
-      raise DATABASE_DOWN_EXCEPTION
-       
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in getting api keys"
-        )
-
-@router.post("/api-keys/generate")
-async def api_key(request: Request, id :int = Depends(get_current_user_id) ):
-    engine = request.app.state.engine
-    try:
-        api_key = generate_api_key()
-        await add_api_key(engine, id, api_key)
-        return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
-    
-    except DATABASE_EXCEPTION:
-        raise DATABASE_EXCEPTION
-
-    except DATABASE_DOWN_EXCEPTION:
-      raise DATABASE_DOWN_EXCEPTION
-    
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in generating api key"
-        )
-
-@router.get('/auth/profile')
+@router.get('/profile')
 async def get_user_profile(request:Request, id :int = Depends(get_current_user_id)):
     engine = request.app.state.engine
 
@@ -350,49 +303,6 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
         )
     
 
-@router.get("/credit")
-async def get_credit(request : Request, id: int = Depends(get_current_user_id)):
-    engine = request.app.state.engine
-    try:
-        credit = await get_credit_for_user(engine, id)
-        return credit
-    
-    except DATABASE_EXCEPTION :
-        raise DATABASE_EXCEPTION
-    
-    except DATABASE_DOWN_EXCEPTION:
-        raise DATABASE_DOWN_EXCEPTION
-    
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in getting user credit"
-        )
-
-
-@router.get("/credit/usage")
-async def get_credit_usage(request : Request, api_key : str = None, page: int = 1, page_size: int = 10, id: int = Depends(get_current_user_id)):
-    engine = request.app.state.engine
-    try:
-        paginated_logs = await get_logs(engine, id , api_key, page, page_size)
-        return paginated_logs
-        
-    
-    except DATABASE_EXCEPTION :
-        raise DATABASE_EXCEPTION
-    
-    except DATABASE_DOWN_EXCEPTION:
-        raise DATABASE_DOWN_EXCEPTION
-    
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in getting user credit"
-        )
-    
-
 
 
 
@@ -403,92 +313,6 @@ async def get_credit_usage(request : Request, api_key : str = None, page: int = 
 # @router.get("/usersall")
 # async def testall():
 #     return await get_all_users()
-
-
-
-@router.route('/{endpoint:path}', methods=['GET', 'POST'])
-async def reverse_proxy(request: Request):
-    engine = request.app.state.engine
-    try:
-        if request.cookies.get('access_token'):
-            token = request.cookies.get('access_token')
-        else:
-            raise COOKIE_EXCEPTION
-    
-        id = await get_current_user_id(request, token)
-
-        
-        if (id):
-            path = request.url.path
-            try:
-                cost = KUBER_ENDPOINTS_COST[path]
-            except KeyError as e:
-                print(e)
-                raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
-
-            if await get_credit_for_user(engine, id) < cost:
-                raise CREDIT_NOT_ENOUGH_EXCEPTION
-            
-            await decrement_endpoint_credit_for_user(engine, id, cost)
-               
-            try:
-                client = request.app.state.client
-                url = httpx.URL(path=path, query=request.url.query.encode('utf-8'))
-                req = client.build_request(
-                    request.method, url, headers=request.headers.raw, content=request.stream()
-                )
-                r = await client.send(req, stream=True)
-                return StreamingResponse(
-                    r.aiter_raw(),
-                    status_code=r.status_code,
-                    headers=r.headers,
-                    background=BackgroundTask(r.aclose)
-                )
-            
-            
-            except Exception as e:
-                print(e)
-                raise KUBER_EXCEPTION
-    
-        else:
-            raise CREDENTIALS_EXCEPTION
-        
-
-    except COOKIE_EXCEPTION as e:
-        print(e)
-        raise COOKIE_EXCEPTION
-    
-    except CREDENTIALS_EXCEPTION as e:
-        print(e)
-        raise CREDENTIALS_EXCEPTION
-    
-    except KUBER_EXCEPTION as e:
-        print(e)
-        raise KUBER_EXCEPTION
-    
-    except ENDPOINT_DOES_NOT_EXIST_EXCEPTION as e:
-        print(e)
-        raise ENDPOINT_DOES_NOT_EXIST_EXCEPTION
-    
-
-    except CREDIT_NOT_ENOUGH_EXCEPTION as e:
-        print(e)
-        raise CREDIT_NOT_ENOUGH_EXCEPTION
-
-    except DATABASE_EXCEPTION as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in reverse proxy"
-        )
-
-    
-
-    
 
 
 

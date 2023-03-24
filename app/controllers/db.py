@@ -13,17 +13,10 @@ from app.models.users import UserinDB
 
 
 DB_DRIVER = config('DB_DRIVER', default="postgresql+psycopg2")
-
-# DB_DRIVER = config('DB_DRIVER') or None
-# if DB_DRIVER is None:
-#     print("Missing DB_DRIVER, using default postgres")
-#     DB_DRIVER = "postgres+psycopg2"
-
 DB_USERNAME = config('DB_USERNAME', default = None) 
 DB_PASSWORD = config('DB_PASSWORD', default = None) 
 DB_HOST = config('DB_HOST', default = None)
 DB_NAME = config('DB_NAME', default= None)
-
 
 if DB_DRIVER != "sqlite":
     if DB_USERNAME is None:
