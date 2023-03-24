@@ -12,14 +12,17 @@ from sqlalchemy.exc import OperationalError
 from app.models.users import UserinDB
 
 
-DB_DRIVER = config('DB_DRIVER') or None
-if DB_DRIVER is None:
-    raise 'Missing DB_DRIVER'
+DB_DRIVER = config('DB_DRIVER', default="postgresql+psycopg2")
 
-DB_USERNAME = config('DB_USERNAME') or None
-DB_PASSWORD = config('DB_PASSWORD') or None
-DB_HOST = config('DB_HOST') or None
-DB_NAME = config('DB_NAME') or None
+# DB_DRIVER = config('DB_DRIVER') or None
+# if DB_DRIVER is None:
+#     print("Missing DB_DRIVER, using default postgres")
+#     DB_DRIVER = "postgres+psycopg2"
+
+DB_USERNAME = config('DB_USERNAME', default = None) 
+DB_PASSWORD = config('DB_PASSWORD', default = None) 
+DB_HOST = config('DB_HOST', default = None)
+DB_NAME = config('DB_NAME', default= None)
 
 
 if DB_DRIVER != "sqlite":
@@ -41,7 +44,6 @@ def startup_db():
         if DB_DRIVER == "sqlite":
             url_object = 'sqlite:///db.sqlite'
             
-
         else:
             url_object = URL.create(
             drivername= DB_DRIVER,
@@ -57,11 +59,11 @@ def startup_db():
         return engine 
     
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -76,11 +78,11 @@ async def add_api_key(engine , id : int, api_key : str):
             session.commit()
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -102,11 +104,13 @@ async def get_api_keys(engine, id : int):
             return api_keys
         
     except OperationalError as e:
-        print(e.detail)
+        print(e)
+
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
+
         raise DATABASE_EXCEPTION    
 
 
@@ -121,11 +125,12 @@ async def add_user(engine, data : UserinDB):
             return user.id
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
+
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -136,11 +141,11 @@ async def get_user_id_by_data(engine, data : UserinDB):
             return user.id
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
  
 
@@ -151,11 +156,11 @@ async def get_all_users(engine):
             return users
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
     
@@ -166,11 +171,11 @@ async def get_user_by_data(engine, data : UserinDB):
             return user
         
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -182,11 +187,11 @@ async def users_exists_by_id(engine, id : int):
         return False
     
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 async def get_user_by_id(engine, id : int):
@@ -196,11 +201,11 @@ async def get_user_by_id(engine, id : int):
             return user
         
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
    
 async def users_exists_by_data(engine, data : UserinDB):
@@ -211,11 +216,11 @@ async def users_exists_by_data(engine, data : UserinDB):
         return False
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -246,11 +251,11 @@ async def get_logs(engine, user_id: str, api_key : str =None, page: int = 1, pag
             
            
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -262,11 +267,11 @@ async def add_blacklist_token(engine, id : int):
             session.commit()
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -279,11 +284,11 @@ async def is_token_blacklisted(engine, id : int):
             return False
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -295,11 +300,11 @@ async def add_credit_for_user(engine, id : int, credit :int):
             session.commit()
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -310,11 +315,11 @@ async def get_credit_for_user(engine, id : int):
             return credit_entry.credit
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
 
 
@@ -326,9 +331,9 @@ async def decrement_endpoint_credit_for_user(engine, id : int, cost :int):
             session.commit()
 
     except OperationalError as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
-        print(e.detail)
+        print(e)
         raise DATABASE_EXCEPTION    
