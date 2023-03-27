@@ -31,9 +31,13 @@ def create_refresh_token(data):
 
 
 def decodeJWT(token: str):
-    payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    # print(payload)
-    return payload if payload["exp"] > time.time() else None
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload if payload["exp"] > time.time() else None
+    
+    except Exception as e:
+        print(e)
+        return None
 
 def verify_jwt(jwtoken : str):
     isTokenValid : bool = False 
