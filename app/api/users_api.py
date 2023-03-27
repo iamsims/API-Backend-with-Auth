@@ -71,7 +71,7 @@ async def login(provider: str, request: Request):
     
 
 
-@router.get('/sso/callback/{provider}')
+@router.get('/sso/callback/{provider}', status_code=status.HTTP_200_OK)
 async def token(request: Request, response: Response):
     engine = request.app.state.engine
     try:
@@ -109,7 +109,7 @@ async def token(request: Request, response: Response):
             id = await get_user_id_by_data(engine, data)
 
         local_token = create_access_token(data={"id": id})
-        response = JSONResponse(content={"result": True}, status_code=200)
+        response = await get_user_profile(request, id)
         response.set_cookie(key="access_token", value=local_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
         return response
     
@@ -155,8 +155,7 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
             data={"id": id},
         )
 
-        print(id)
-        response = JSONResponse(content={"result": True}, status_code=200)
+        response = await get_user_profile(request, id)
         response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
         return response
     
@@ -189,17 +188,16 @@ async def login_for_access_token(request:Request, form : OAuth2PasswordRequestFo
         if not user_exists:
             raise INCORRECT_USERNAME_EXCEPTION
         user_in_db = await get_user_by_data(engine, data)
-
-        print(user_in_db, "user_in_db")
+        id = user_in_db.id
 
         if not verify_password(form.password, user_in_db.hashed_pw):
             raise INCORRECT_PASSWORD_EXCEPTION
         access_token = create_access_token(
-            data={"id": user_in_db.id},
+            data={"id": id},
         )
-        print(user_in_db.id)
+        print(id)
 
-        response = JSONResponse(content={"result": True}, status_code=200)
+        response = await get_user_profile(request, id)
         response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
         return response
     
@@ -324,7 +322,7 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
             "provider_id": data.provider_id,
             "email": data.email
         }
-        return profile
+        return JSONResponse(content=profile, status_code=200)
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
