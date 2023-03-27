@@ -39,18 +39,18 @@ router = APIRouter()
 
 
 @router.get('/sso/login/{provider}')
-async def login(provider: str, request: Request):
+async def login(provider: str, request: Request, state : str = None):
     try:
         match provider:
             case "google":
                 base_url = request.base_url
                 redirect_uri = f"{base_url}auth/sso/callback/google"
-                return await oauth.google.authorize_redirect(request, redirect_uri)
+                return await oauth.google.authorize_redirect(request, redirect_uri, state = state)
     
             case "github":
                 scope = "read:user user:email"
                 encoded_scope = quote(scope)
-                return RedirectResponse(url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope={encoded_scope}', status_code = 302) 
+                return RedirectResponse(url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope={encoded_scope}&state={state}', status_code = 302) 
                 
             case _:
                 raise PROVIDER_EXCEPTION
