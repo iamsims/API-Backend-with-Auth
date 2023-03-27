@@ -1,7 +1,7 @@
 import datetime
 import secrets
 from typing import Union
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status 
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, WebSocket, status 
 
 import httpx
 from jose import JWTError
@@ -226,10 +226,43 @@ async def login_for_access_token(request:Request, form : OAuth2PasswordRequestFo
 async def get_current_user_token(request:Request, access_token: Union[str, None] = Cookie(None)):
     if access_token is None:
         raise COOKIE_EXCEPTION
-    _ = await get_current_user_id(request, access_token)
+    _ = await get_current_user_id_http(request, access_token)
     return access_token
 
-async def get_current_user_id(request:Request, access_token: Union[str, None] = Cookie(None)):
+
+async def get_current_user_id_ws(websocket: WebSocket, access_token: str):
+
+    engine = websocket.app.state.engine
+    if access_token is None:
+        raise COOKIE_EXCEPTION
+
+    if await is_token_blacklisted(engine, access_token):
+        print("Token is blacklisted")
+        raise CREDENTIALS_EXCEPTION
+        
+    payload = decodeJWT(token=access_token)
+
+    if payload is None:
+        print("Unable to extract payload")
+        raise CREDENTIALS_EXCEPTION
+   
+    
+    id = payload.get("id", None)
+    
+    if id is None:
+        print("id could not be extracted")
+        raise CREDENTIALS_EXCEPTION
+    
+    user_exists = await users_exists_by_id(engine, id)
+    if user_exists:
+        return id 
+    
+    raise CREDENTIALS_EXCEPTION
+
+
+
+async def get_current_user_id_http(request: Request, access_token: Union[str, None] = Cookie(None)):
+
     engine = request.app.state.engine
     if access_token is None:
         raise COOKIE_EXCEPTION
@@ -239,7 +272,12 @@ async def get_current_user_id(request:Request, access_token: Union[str, None] = 
         raise CREDENTIALS_EXCEPTION
     
     payload = decodeJWT(token=access_token)
-    id = payload.get("id")
+    
+    if payload is None:
+        print("Unable to extract payload")
+        raise CREDENTIALS_EXCEPTION
+    
+    id = payload.get("id", None)
     
     if id is None:
         print("id could not be extracted")
@@ -275,7 +313,7 @@ async def logout(request:Request, token: str = Depends(get_current_user_token)):
         )
 
 @router.get('/profile')
-async def get_user_profile(request:Request, id :int = Depends(get_current_user_id)):
+async def get_user_profile(request:Request, id :int = Depends(get_current_user_id_http)):
     engine = request.app.state.engine
 
     try:
@@ -378,7 +416,7 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
 
 
 
-# # async def get_current_user_identifier(data : UserinDB = Depends(get_current_user_id)):
+# # async def get_current_user_id_httpentifier(data : UserinDB = Depends(get_current_user_id_http)):
 # #     return data.identifier
   
 
