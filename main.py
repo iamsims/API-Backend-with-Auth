@@ -10,8 +10,10 @@ from app.api.ws_proxy import router as ws_proxy_router
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
 import httpx
-
+from fastapi.middleware.cors import CORSMiddleware
 from app.controllers.db import startup_db
+
+
 
 
 SESSION_SECRET_KEY = config('SESSION_SECRET_KEY') or None
@@ -24,6 +26,12 @@ if KUBER_SERVER is None:
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(users_router, prefix= "/auth")
 app.include_router(api_keys_router, prefix = "/api/v1")
