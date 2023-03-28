@@ -58,9 +58,6 @@ async def login(provider: str, request: Request, state : str = None):
     except PROVIDER_EXCEPTION:
         raise PROVIDER_EXCEPTION
     
-    except DATABASE_DOWN_EXCEPTION:
-      raise DATABASE_DOWN_EXCEPTION
-   
 
     except Exception as e:
         print(e)
@@ -116,19 +113,24 @@ async def token(request: Request, response: Response):
 
     except PROVIDER_EXCEPTION:
         raise PROVIDER_EXCEPTION
-    
-    except DATABASE_EXCEPTION:
-        raise DATABASE_EXCEPTION
-    
-    except DATABASE_DOWN_EXCEPTION:
-        raise DATABASE_DOWN_EXCEPTION
-   
 
-    except Exception as e:
+    except OAuthError as e:
         print(e)
         raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail= e.error
+        )
+    
+    except DATABASE_EXCEPTION as e:
+        raise DATABASE_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION as e:
+        raise DATABASE_DOWN_EXCEPTION
+
+    except Exception as e:
+        raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in obtaining token"
+        detail= "Exception in getting token"
         )
 
     
