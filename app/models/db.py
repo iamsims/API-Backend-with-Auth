@@ -40,7 +40,7 @@ class User(Base):
     provider_id = Column(String, nullable = True)
     provider = Column(String)
     api_keys = relationship("ApiKey", back_populates="user", cascade='all, delete-orphan')
-    credit_tracking = relationship("CreditTracking",  uselist=False, cascade="all, delete")
+    credit_tracking = relationship("CreditTracking",  uselist=False, cascade="all, delete-orphan")
 
     
     def __repr__(self) -> str:
