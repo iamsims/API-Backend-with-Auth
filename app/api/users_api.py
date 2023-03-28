@@ -1,5 +1,6 @@
 import datetime
 import secrets
+import traceback
 from typing import Union
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, WebSocket, status 
 
@@ -36,15 +37,26 @@ from app.auth.oauth import get_github_token, get_google_token, get_user_info_git
 
 
 router = APIRouter()
-
+from urllib.parse import *
 
 @router.get('/sso/login/{provider}')
-async def login(provider: str, request: Request, state : str = None):
+async def login(provider: str, request: Request, state : str = None,redirect_url: str=None):
     try:
         match provider:
             case "google":
+                
                 base_url = request.base_url
-                redirect_uri = f"{base_url}auth/sso/callback/google"
+                referer=request.headers.get('referer')
+                
+                client_redirect_url=redirect_uri=request.query_params.get('redirect_url')
+                if client_redirect_url:
+                    redirect_uri=client_redirect_url
+                elif referer: 
+                    referer_url = urlparse(referer,"")
+                    redirect_uri=referer_url.scheme+"://"+referer_url.netloc+"/kuber/oauth/callback/google"
+                else:
+                    redirect_uri = f"{base_url}auth/sso/callback/google"
+                    
                 return await oauth.google.authorize_redirect(request, redirect_uri, state = state)
     
             case "github":
@@ -59,8 +71,8 @@ async def login(provider: str, request: Request, state : str = None):
         raise PROVIDER_EXCEPTION
     
 
-    except Exception as e:
-        print(e)
+    except Exception as ex:
+        traceback.print_exception(type(ex), ex, ex.__traceback__)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in login"
