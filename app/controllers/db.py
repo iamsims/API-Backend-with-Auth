@@ -60,13 +60,14 @@ def startup_db():
         raise DATABASE_EXCEPTION    
 
 
-async def add_api_key(engine , id : int, api_key : str):
+async def add_api_key(engine , id : int, api_key : str, name : str = None):
     try:
         with Session(engine) as session:
             # todo check if i can insert user directly without actually inserting it
             user = await get_user_by_id(engine, id) 
             expiration_date = datetime.datetime.now() + datetime.timedelta(days=30)
-            api_key = ApiKey(key=api_key, user=user, expiration_date=expiration_date, user_id=id)
+            created = datetime.datetime.now()
+            api_key = ApiKey(key=api_key, user=user, expiration_date=expiration_date, user_id=id, created=created, name=name)
             session.add(api_key)
             session.commit()
 
@@ -79,6 +80,38 @@ async def add_api_key(engine , id : int, api_key : str):
         raise DATABASE_EXCEPTION    
 
 
+async def delete_api_key(engine, api_key : str):
+    try:
+        with Session(engine) as session:
+            key = session.query(ApiKey).filter_by(key=api_key).first()
+            session.delete(key)
+            session.commit()
+
+    except OperationalError as e:
+        print(e)
+        raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+    
+
+async def get_user_id_by_api_key(engine, api_key : str):
+    try:
+        with Session(engine) as session:
+            key = session.query(ApiKey).filter_by(key=api_key).first()
+            if key:
+                return key.user.id
+            return None
+
+    except OperationalError as e:
+        print(e)
+        raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+
 async def get_api_keys(engine, id : int):
     try:
         with Session(engine) as session:
@@ -86,7 +119,6 @@ async def get_api_keys(engine, id : int):
             api_keys = []
            
             for key in user.api_keys:
-                print(key.expiration_date)
                 if datetime.datetime.strptime(key.expiration_date, '%Y-%m-%d %H:%M:%S.%f') < datetime.datetime.now():
                     session.delete(key)
                     session.commit()
@@ -98,12 +130,10 @@ async def get_api_keys(engine, id : int):
         
     except OperationalError as e:
         print(e)
-
         raise DATABASE_DOWN_EXCEPTION
     
     except Exception as e:
         print(e)
-
         raise DATABASE_EXCEPTION    
 
 

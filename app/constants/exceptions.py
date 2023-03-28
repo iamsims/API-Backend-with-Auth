@@ -14,6 +14,17 @@ class CREDENTIALS_EXCEPTION(HTTPException):
         self.detail = "Could not validate credentials"
         super().__init__(status_code=self.status_code, detail=self.detail)
 
+class NOT_AUTHORIZED_EXCEPTION(HTTPException):
+    def __init__(self):
+        self.status_code = status.HTTP_401_UNAUTHORIZED
+        self.detail = "You are not authorized to perform this request"
+        super().__init__(status_code=self.status_code, detail=self.detail)
+
+class DOESNT_EXIST_EXCEPTION(HTTPException):
+    def __init__(self, detail):
+        self.status_code = status.HTTP_404_NOT_FOUND
+        self.detail = detail
+        super().__init__(status_code=self.status_code, detail=self.detail)
 
 class SIGNUP_EXCEPTION(HTTPException):
     def __init__(self):

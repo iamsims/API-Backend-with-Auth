@@ -52,6 +52,8 @@ class ApiKey(Base):
     expiration_date = Column(String, nullable = True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete = 'CASCADE'))
     user = relationship("User", back_populates="api_keys")
+    name = Column(String, nullable = True)
+    created = Column(String, nullable = True)
 
 
 class CreditTracking (Base):

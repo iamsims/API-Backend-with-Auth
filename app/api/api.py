@@ -7,8 +7,8 @@ from fastapi import Request
 from decouple import config
 from app.auth.api_key import generate_api_key
 
-from app.constants.exceptions import  DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION
-from app.controllers.db import add_api_key,  get_api_keys, get_credit_for_user, get_logs
+from app.constants.exceptions import  CREDENTIALS_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, DOESNT_EXIST_EXCEPTION, NOT_AUTHORIZED_EXCEPTION
+from app.controllers.db import add_api_key,  get_api_keys, get_credit_for_user, get_logs, delete_api_key, get_user_id_by_api_key
 from app.api.users_api import get_current_user_id_http
 
 router = APIRouter()
@@ -35,12 +35,45 @@ async def api_keys(request : Request, id:int = Depends(get_current_user_id_http)
         detail="Exception in getting api keys"
         )
 
+@router.delete('/api-key')
+async def delete_api_keys(request : Request, api_key: str, id:int = Depends(get_current_user_id_http)):
+    engine = request.app.state.engine
+    try:
+        id_api_key = await get_user_id_by_api_key(engine, api_key)
+        if id_api_key is None:
+            raise DOESNT_EXIST_EXCEPTION("API key doesn't exist")
+        
+        if id_api_key != id:
+            raise NOT_AUTHORIZED_EXCEPTION
+        
+        await delete_api_key(engine, api_key)
+        return JSONResponse(content={"result": True}, status_code=200)
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+   
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+    
+    except DOESNT_EXIST_EXCEPTION as e:
+        raise e
+    
+    except NOT_AUTHORIZED_EXCEPTION:
+        raise NOT_AUTHORIZED_EXCEPTION
+       
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in deleting api key"
+        )
+
 @router.post("/api-keys/generate")
-async def api_key(request: Request, id :int = Depends(get_current_user_id_http) ):
+async def api_key(request: Request, name : str = None, id :int = Depends(get_current_user_id_http)):
     engine = request.app.state.engine
     try:
         api_key = generate_api_key()
-        await add_api_key(engine, id, api_key)
+        await add_api_key(engine, id, api_key, name)
         return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
     
     except DATABASE_EXCEPTION:
