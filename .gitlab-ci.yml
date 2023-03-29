@@ -6,6 +6,8 @@ services:
 build:
     stage: build
     image: docker
+    tags:
+        - shell
     script:
         - docker info
         - if [ "$CI_COMMIT_REF_NAME" == "develop" ]; then COMMON_TAG="nightly"; elif [ "$CI_COMMIT_REF_NAME" == "master" ]; then COMMON_TAG="latest"; else COMMON_TAG=$CI_COMMIT_REF_SLUG; fi
