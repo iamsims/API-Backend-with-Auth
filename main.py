@@ -2,7 +2,6 @@ import sys
 from fastapi import FastAPI, HTTPException
 from app.api.users_api import router as users_router
 from app.api.api import router as api_keys_router
-from app.api.http_proxy import router as http_proxy_router
 from app.api.ws_proxy import router as ws_proxy_router
 
 
@@ -24,19 +23,26 @@ KUBER_SERVER = config('KUBER_SERVER') or None
 if KUBER_SERVER is None:
     raise 'Missing KUBER_SERVER'
 
+CORS_DOMAINS= config('CORS_DOMAINS') or None
+if CORS_DOMAINS is None:
+    print('Missing CORS_DOMAINS')
+    CORS_DOMAINS = '*'
+    
+CORS_DOMAINS = CORS_DOMAINS.split(',')
+
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_DOMAINS,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 app.include_router(users_router, prefix= "/auth")
 app.include_router(api_keys_router, prefix = "/api/v1")
 app.include_router(ws_proxy_router)
-app.include_router(http_proxy_router)
 
 @app.on_event('startup')
 async def startup_event():
