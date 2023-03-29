@@ -119,7 +119,7 @@ async def token(request: Request, response: Response):
 
         local_token = create_access_token(data={"id": id})
         response = await get_user_profile(request, id)
-        response.set_cookie(key="access_token", value=local_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+        set_access_cookie(request,response,local_token)
         return response
     
 
@@ -170,7 +170,7 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
         )
 
         response = await get_user_profile(request, id)
-        response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+        set_access_cookie(request,response,access_token)
         return response
     
     except ALREADY_REGISTERED_EXCEPTION:
@@ -212,7 +212,6 @@ async def login_for_access_token(request:Request, form : OAuth2PasswordRequestFo
         print(id)
 
         response = await get_user_profile(request, id)
-        response.set_cookie(key="access_token", value=access_token, httponly=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
         return response
     
     except INCORRECT_USERNAME_EXCEPTION:
@@ -234,6 +233,9 @@ async def login_for_access_token(request:Request, form : OAuth2PasswordRequestFo
         detail="Exception in login"
         )
 
+def set_access_cookie(req:Request,res:Response,access_token):
+    host=req.headers.get('host')
+    res.set_cookie(key="access_token",domain=host.split(':')[0], value=access_token,samesite="none", secure=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
 
 async def get_current_user_token(request:Request, access_token: Union[str, None] = Cookie(None)):
     if access_token is None:
