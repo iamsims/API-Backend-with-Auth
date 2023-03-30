@@ -10,6 +10,12 @@ from decouple import config
 from sqlalchemy.exc import OperationalError
 
 from app.models.users import UserinDB
+import pickle
+from fastapi import status 
+
+
+from decouple import config
+from app.models.db import  LogEntry
 
 
 DB_DRIVER = config('DB_DRIVER', default="postgresql+psycopg2")
@@ -30,6 +36,8 @@ if DB_DRIVER != "sqlite":
 
     if DB_NAME is None:
         raise 'Missing DB_NAME'
+
+
 
 
 def startup_db():
@@ -58,6 +66,25 @@ def startup_db():
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION    
+
+
+
+
+
+async def add_log_entry(engine, data: LogEntry):
+    try:
+        with Session(engine) as session:
+            session.add(data)
+            session.commit()
+
+    except OperationalError as e:
+        print(e)
+        raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+
 
 
 async def add_api_key(engine , id : int, api_key : str, name : str = None):
@@ -346,7 +373,7 @@ async def get_credit_for_user(engine, id : int):
         raise DATABASE_EXCEPTION    
 
 
-async def decrement_endpoint_credit_for_user(engine, id : int, cost :int):
+async def decrement_credit_for_user(engine, id : int, cost :int):
     try:
         with Session(engine) as session:
             credit_entry = session.query(CreditTracking).filter_by(user_id=id).first()
