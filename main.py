@@ -25,11 +25,10 @@ if KUBER_SERVER is None:
 
 CORS_DOMAINS= config('CORS_DOMAINS') or None
 if CORS_DOMAINS is None:
-    print('Missing CORS_DOMAINS')
-    CORS_DOMAINS = '*'
-    
-CORS_DOMAINS = CORS_DOMAINS.split(',')
+    raise 'Missing CORS_DOMAINS'
 
+CORS_DOMAINS = CORS_DOMAINS.split(',')
+print(CORS_DOMAINS)
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 app.add_middleware(

@@ -25,19 +25,18 @@ from app.auth.jwt_handler import create_access_token, decodeJWT, create_refresh_
 from datetime import timedelta
 from app.auth.password_handler import get_password_hash, verify_password
 
-from app.controllers.db import add_api_key, add_user, decrement_endpoint_credit_for_user, get_api_keys, get_logs, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id, get_credit_for_user, add_credit_for_user
+from app.controllers.db import add_api_key, add_log_entry, add_user, get_api_keys, get_logs, get_user_by_data, get_user_by_id, get_user_id_by_data, users_exists_by_data, add_blacklist_token, is_token_blacklisted, get_all_users, users_exists_by_id, get_credit_for_user, add_credit_for_user
 
 from app.models.users import UserinDB, UserLoginSchema
 
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
-from app.models.db import KUBER_ENDPOINTS_COST
+from app.models.db import KUBER_ENDPOINTS_COST, LogEntry
 from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
 
 
 router = APIRouter()
-from urllib.parse import *
 
 @router.get('/sso/login/{provider}')
 async def login(provider: str, request: Request, state : str = None,redirect_url: str=None):
@@ -119,7 +118,7 @@ async def token(request: Request, response: Response):
 
         local_token = create_access_token(data={"id": id})
         response = await get_user_profile(request, id)
-        set_access_cookie(request,response,local_token)
+        response.set_cookie(key="access_token", value=local_token, httponly=True, secure= True, samesite="none", expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
         return response
     
 
@@ -170,7 +169,7 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
         )
 
         response = await get_user_profile(request, id)
-        set_access_cookie(request,response,access_token)
+        response.set_cookie(key="access_token", value=access_token, httponly=True, secure= True, samesite="none", expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)        
         return response
     
     except ALREADY_REGISTERED_EXCEPTION:
@@ -212,6 +211,7 @@ async def login_for_access_token(request:Request, form : OAuth2PasswordRequestFo
         print(id)
 
         response = await get_user_profile(request, id)
+        response.set_cookie(key="access_token", value=access_token, httponly=True, secure= True, samesite="none", expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)        
         return response
     
     except INCORRECT_USERNAME_EXCEPTION:
@@ -233,9 +233,6 @@ async def login_for_access_token(request:Request, form : OAuth2PasswordRequestFo
         detail="Exception in login"
         )
 
-def set_access_cookie(req:Request,res:Response,access_token):
-    host=req.headers.get('host')
-    res.set_cookie(key="access_token",domain=host.split(':')[0], value=access_token,samesite="none", secure=True, expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
 
 async def get_current_user_token(request:Request, access_token: Union[str, None] = Cookie(None)):
     if access_token is None:
@@ -331,6 +328,7 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
     engine = request.app.state.engine
 
     try:
+
         data =await get_user_by_id(engine, id)
         profile = {
             "identifier": data.identifier,
