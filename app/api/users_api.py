@@ -6,7 +6,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, WebSock
 
 import httpx
 from jose import JWTError
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from starlette.config import Config
 from starlette.responses import JSONResponse
 from fastapi import Request
