@@ -21,8 +21,8 @@ COPY ./requirements.txt ./requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ./alembic.ini ./alembic.ini
-COPY ./alembic ./alembic
+COPY ./schema.prisma ./schema.prisma
+COPY ./migrations ./migrations
 COPY ./entrypoint.sh ./entrypoint.sh
 COPY ./main.py ./main.py
 COPY ./app ./app
