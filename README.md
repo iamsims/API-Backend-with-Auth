@@ -3,15 +3,25 @@
 python3 -m venv fastapienv 
 source fastapienv/bin/activate 
 pip install -r requirements.txt 
-alembic upgrade head 
+prisma migrate deploy 
+prisma generate
 uvicorn main:app --reload
 ```
 
 
 # Data Migration
-alembic revision --autogenerate -m "message"
-alembic upgrade head
 
+Create
+```bash
+prisma migrate dev --name `name` --create-only
+```
+
+Sync
+```bash
+prisma migrate deploy 
+```
+
+<!-- 
 # API Documentation 
 
 ## Authentication Endpoints
@@ -184,4 +194,4 @@ If an error occurs, an error response is returned.
 # TODO 
 
 - [ ] Write tests
-- [ ] Extract from users_view to controllers
+- [ ] Extract from users_view to controllers -->
