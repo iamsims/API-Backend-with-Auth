@@ -1,7 +1,6 @@
 import sys
 from fastapi import FastAPI, HTTPException
 from app.api.users_api import router as users_router
-from app.api.test_router import router as test_router
 from app.api.api import router as api_keys_router
 from app.api.ws_proxy import router as ws_proxy_router
 
