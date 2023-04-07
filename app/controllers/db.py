@@ -154,6 +154,11 @@ async def get_api_keys(id : int):
             }
         )
 
+        for key in keys:
+            if key.expiration_date and key.expiration_date < datetime.datetime.timestamp(datetime.datetime.now()):
+                await delete_api_key(key.key)
+                keys.remove(key)
+        
         keys = [key.key for key in keys]
 
         return keys
@@ -201,15 +206,12 @@ async def add_log_entry(start_time, duration, ip_address, cost, user_id, api_key
 
 async def add_api_key( id : int, api_key : str, name : str = None):
     try:
-        user = await get_user_by_id(id)
-        expiration_date = datetime.datetime.now() + datetime.timedelta(days=30)
-        created = datetime.datetime.now()
+        expiration_date = datetime.datetime.timestamp(datetime.datetime.now() + datetime.timedelta(days=30))
         await prisma.api_keys.create(
             data={
             "key": api_key,
             "user_id": id,
             "expiration_date": expiration_date,
-            "created": created,
             "name": name,
         })
 
