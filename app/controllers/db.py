@@ -249,7 +249,7 @@ async def get_logs(user_id: str, api_key : str =None, page: int = 1, page_size: 
                 skip=(page - 1) * page_size,
                 take=page_size,
                 order={
-                    "start_time": "asc"
+                    "end_time": "desc"
                 }
             )
             count = await prisma.logs.count(
@@ -265,8 +265,9 @@ async def get_logs(user_id: str, api_key : str =None, page: int = 1, page_size: 
                 },
                 skip=(page - 1) * page_size,
                 take=page_size,
-                orderBy={
-                    "start_time": "asc"
+                order={
+                    "end_time": "desc"
+
                 }
             )
             count = await prisma.logs.count(
