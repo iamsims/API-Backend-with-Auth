@@ -24,27 +24,23 @@ from app.db.prisma import prisma
 from app.models.users import UserinDB
 
 
-async def get_user_by_data( data: UserinDB):
+async def get_user( data: UserinDB):
     try:
-        user = await prisma.users.find_first(
-            where={
-                "identifier": data.identifier,
-                "provider": data.provider,
-            }
-        )
+        if data.provider == "password":
+            user = await prisma.users.find_first(
+                where={
+                    "identifier": data.identifier,
+                }
+            )
+        
+        else :
+            user = await prisma.users.find_first(
+                where={
+                "email": data.email,
+                }
+            )
+
         return user
-
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-
-
-async def users_exists_by_data( data: UserinDB):
-    try:
-        user = await get_user_by_data(data)
-        if user:
-            return True
-        return False
 
     except Exception as e:
         print(e)
@@ -80,20 +76,6 @@ async def create_credit_for_user( id : int, credit :int):
         print(e)
         raise DATABASE_EXCEPTION    
 
-async def get_user_id_by_data( data: UserinDB):
-    try:
-        user = await prisma.users.find_first(
-            where={
-                "identifier": data.identifier,
-            }
-        )
-        return user.id
-
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION    
-
-
 async def is_token_blacklisted( id):
     try:
         token = await prisma.blacklist.find_unique(
@@ -108,18 +90,7 @@ async def is_token_blacklisted( id):
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION
-
-
-async def users_exists_by_id( id : int):
-    try:
-        user = await get_user_by_id(id)
-        if user:
-            return True
-        return False
-    
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION    
+ 
 
 async def get_user_by_id( id : int):
     try:

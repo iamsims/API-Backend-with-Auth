@@ -17,7 +17,7 @@ from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPT
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 from app.auth.jwt_handler import create_access_token, decodeJWT
 from app.auth.password_handler import get_password_hash, verify_password
-from app.controllers.db import add_blacklist_token, create_credit_for_user, add_user, get_user_by_data, get_user_by_id, get_user_id_by_data, is_token_blacklisted, users_exists_by_data, users_exists_by_id
+from app.controllers.db import add_blacklist_token, create_credit_for_user, add_user, get_user, get_user_by_id, is_token_blacklisted
 
 
 from app.models.users import UserinDB
@@ -91,23 +91,23 @@ async def token(request: Request, response: Response):
             case "github":
                 access_token = await get_github_token(request.query_params['code'])
                 user_info = await get_user_info_github(access_token)
-                user_id, username, user_email, user_image  = user_info['id'], user_info["login"], user_info['email'], user_info["avatar_url"]
+                provider_id, username, user_email, user_image  = user_info['id'], user_info["login"], user_info['email'], user_info["avatar_url"]
                 data = UserinDB(
                     identifier = username,
                     email = user_email,
                     provider = "github",
-                    provider_id = user_id, 
+                    provider_id = provider_id, 
                     image = user_image
                 )
 
             case _:
                 raise PROVIDER_EXCEPTION
             
-        user_exists = await users_exists_by_data( data) 
-        if not user_exists:
-            id = await initialize_user( data)
+        user = await get_user(data) 
+        if not user:
+            id = await initialize_user(data)
         else:
-            id = await get_user_id_by_data( data)
+            id = user.id
 
         local_token = create_access_token(data={"id": id})
         response = await get_user_profile(request, id)
@@ -150,11 +150,11 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
         hashed_password = get_password_hash(form.password)
         data = UserinDB(**{"identifier": form.username, "provider": "password", "hashed_pw": hashed_password})
         
-        user_exists = await users_exists_by_data( data)
-        if user_exists:
+        user = await get_user(data)
+        if user:
             raise ALREADY_REGISTERED_EXCEPTION
         
-        id = await initialize_user( data)
+        id = await initialize_user(data)
         
         access_token = create_access_token(
             data={"id": id},
@@ -188,13 +188,14 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
 async def login_for_access_token(request:Request, form : OAuth2PasswordRequestForm = Depends()):
     try:
         data = UserinDB(**{"identifier": form.username, "provider": "password"})
-        user_exists = await users_exists_by_data( data)
-        if not user_exists:
+        user = await get_user(data)
+        if not user:
             raise INCORRECT_USERNAME_EXCEPTION
-        user_in_db = await get_user_by_data( data)
-        id = user_in_db.id
+        
+        id = user.id
+        hashed_pw = user.hashed_pw
 
-        if not verify_password(form.password, user_in_db.hashed_pw):
+        if not verify_password(form.password, hashed_pw):
             raise INCORRECT_PASSWORD_EXCEPTION
         access_token = create_access_token(
             data={"id": id},
@@ -254,8 +255,8 @@ async def get_current_user_id_ws( access_token: str):
         print("id could not be extracted")
         raise CREDENTIALS_EXCEPTION
     
-    user_exists = await users_exists_by_id(id)
-    if user_exists:
+    user = await get_user_by_id(id)
+    if user:
         return id 
     
     raise CREDENTIALS_EXCEPTION
@@ -282,8 +283,8 @@ async def get_current_user_id_http(request: Request, access_token: Union[str, No
         print("id could not be extracted")
         raise CREDENTIALS_EXCEPTION
     
-    user_exists = await users_exists_by_id(id)
-    if user_exists:
+    user = await get_user_by_id(id)
+    if user:
         return id 
     
     raise CREDENTIALS_EXCEPTION
@@ -315,7 +316,7 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
 
     try:
 
-        data =await get_user_by_id( id)
+        data =await get_user_by_id(id)
         profile = {
             "identifier": data.identifier,
             "provider": data.provider,
