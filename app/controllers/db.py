@@ -153,6 +153,9 @@ async def get_api_keys(id : int):
                 "user_id": id,
             }
         )
+
+        keys = [key.key for key in keys]
+
         return keys
     
     except Exception as e:
