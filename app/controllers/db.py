@@ -18,6 +18,7 @@
 
 import datetime
 import math
+import time
 from app.constants.exceptions import DATABASE_EXCEPTION
 from app.db.prisma import prisma
 from app.models.users import UserinDB
@@ -154,8 +155,9 @@ async def get_api_keys(id : int):
             }
         )
 
+        now = time.time()*1000 # in milliseconds
         for key in keys:
-            if key.expiration_date and key.expiration_date < datetime.datetime.timestamp(datetime.datetime.now()):
+            if key.expiration_date and key.expiration_date < now:
                 await delete_api_key(key.key)
                 keys.remove(key)
         
@@ -181,12 +183,12 @@ async def get_user_id_by_api_key(api_key : str):
         print(e)
         raise DATABASE_EXCEPTION
 
-async def add_log_entry(start_time, duration, ip_address, cost, user_id, api_key = None, endpoint = None, method = None, status_code = None, request_headers = None, response_headers = None):
+async def add_log_entry(start_time, end_time, ip_address, cost, user_id, api_key = None, endpoint = None, method = None, status_code = None, request_headers = None, response_headers = None):
     try:
         await prisma.logs.create(
             data={
             "start_time": start_time,
-            "duration": duration,
+            "end_time": end_time,
             "ip_address": ip_address,
             "cost": cost,
             "user_id": user_id,
@@ -206,12 +208,15 @@ async def add_log_entry(start_time, duration, ip_address, cost, user_id, api_key
 
 async def add_api_key( id : int, api_key : str, name : str = None):
     try:
-        expiration_date = datetime.datetime.timestamp(datetime.datetime.now() + datetime.timedelta(days=30))
+        created = math.floor(time.time()*1000) # in milliseconds
+        expiration_date = created + 60 * 60 * 24 * 30 * 1000 # in milliseconds
+
         await prisma.api_keys.create(
             data={
             "key": api_key,
             "user_id": id,
             "expiration_date": expiration_date,
+            "created": created,
             "name": name,
         })
 
