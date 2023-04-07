@@ -78,24 +78,26 @@ async def token(request: Request, response: Response):
         match provider:
             case "google":
                 access_token = await get_google_token(request)
-                user_email, provider_id = access_token['userinfo']["email"] , access_token['userinfo']["sub"]
+                user_email, provider_id, user_image  = access_token['userinfo']["email"] , access_token['userinfo']["sub"], access_token['userinfo']["picture"]
                 data = UserinDB(
                     identifier = user_email,
                     email = user_email,
                     provider = "google",
-                    provider_id = provider_id
+                    provider_id = provider_id, 
+                    image = user_image
                 )
                 
             
             case "github":
                 access_token = await get_github_token(request.query_params['code'])
                 user_info = await get_user_info_github(access_token)
-                user_id, username, user_email  = user_info['id'], user_info["login"], user_info['email']
+                user_id, username, user_email, user_image  = user_info['id'], user_info["login"], user_info['email'], user_info["avatar_url"]
                 data = UserinDB(
                     identifier = username,
                     email = user_email,
                     provider = "github",
-                    provider_id = user_id
+                    provider_id = user_id, 
+                    image = user_image
                 )
 
             case _:
@@ -318,7 +320,8 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
             "identifier": data.identifier,
             "provider": data.provider,
             "provider_id": data.provider_id,
-            "email": data.email
+            "email": data.email,
+            "image": data.image
         }
         return JSONResponse(content=profile, status_code=200)
     

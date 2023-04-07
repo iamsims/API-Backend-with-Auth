@@ -59,6 +59,7 @@ async def add_user( data: UserinDB):
         'hashed_pw': data.hashed_pw,
         'provider': data.provider,
         'provider_id': data.provider_id,
+        'image': data.image
 
     })
         return user.id

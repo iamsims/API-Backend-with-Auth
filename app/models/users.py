@@ -8,6 +8,7 @@ class UserinDB(BaseModel):
     provider: str
     provider_id: Union[str, None] = None
     api_key: Union[str, None] = None
+    image: Union[str, None] = None
 
 
 class UserLoginSchema(BaseModel):
