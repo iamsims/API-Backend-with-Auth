@@ -1,39 +1,25 @@
-# A Dockerfile is a text document that contains all the commands
-# a user could call on the command line to assemble an image.
-
 FROM python:3.10
 
-# We create folder named build for our stuff.
-
+# We create home folder for non-root user.
 RUN useradd -u 1001 -U  -d /server -m  app
 WORKDIR /server
-
-# Basic WORKDIR is just /
-# Now we just want to our WORKDIR to be /build
+ENV PATH="$PATH:/server/.local/bin"
+USER app
 
 COPY ./requirements.txt ./requirements.txt
 
-
-# FROM [path to files from the folder we run docker run]
-# TO [current WORKDIR]
-# We copy our files (files from .dockerignore are ignored)
-# to the WORKDIR
-
+# install all the packages with cache disabled. (this layer will be cached unless requirements.txt is changed.)
 RUN pip install --no-cache-dir -r requirements.txt
 
+# copy schema and generate schema
 COPY ./schema.prisma ./schema.prisma
-COPY ./migrations ./migrations
-COPY ./entrypoint.sh ./entrypoint.sh
-COPY ./main.py ./main.py
-COPY ./app ./app
+RUN prisma generate
 
-# OK, now we pip install our requirements
+
+# Copy the code
+COPY ./ ./
+
+
 
 EXPOSE 8080
-
-
-# Now we just want to our WORKDIR to be /build/app for simplicity
-# We could skip this part and then type
-# python -m uvicorn main.app:app ... below
-USER app
 CMD /server/entrypoint.sh 

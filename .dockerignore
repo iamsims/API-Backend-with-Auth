@@ -28,3 +28,9 @@ archive.zip
 fastapienv
 .env 
 .gitlab-ci.yml
+README.md
+.env.example
+.gitignore
+.git
+Dockerfile
+.dockerignore
