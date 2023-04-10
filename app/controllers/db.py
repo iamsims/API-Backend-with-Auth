@@ -1,22 +1,5 @@
-# import datetime
-# import math
-# import sys
-# from sqlalchemy import create_engine, func
-# from sqlalchemy.orm import Session
-# from app.constants.exceptions import DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION
-# from app.models.db import Base, Blacklist, CreditTracking, LogEntry, User, ApiKey
-# from sqlalchemy import URL
-# from decouple import config
-# from sqlalchemy.exc import OperationalError
-
-# import pickle
-# from fastapi import status 
-
-
-# from decouple import config
-# from app.models.db import  LogEntry
-
 import datetime
+import json
 import math
 import time
 from app.constants.exceptions import DATABASE_EXCEPTION
@@ -47,17 +30,51 @@ async def get_user( data: UserinDB):
         raise DATABASE_EXCEPTION
 
 
-async def add_user( data: UserinDB):
+async def add_user_identity(id , data: UserinDB, provider_data):
+    try:
+        jsondata = json.dumps(provider_data)
+        identity = await prisma.user_identities.create(data={
+            "user_id": id,
+            "provider": data.provider,
+            "provider_id": data.provider_id,
+            "provider_data": jsondata
+        })
+        return identity.user_id
+
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+
+
+async def get_user_identity_by_provider(id : int, provider : str):
+    try:
+        user = await prisma.user_identities.find_first(
+            where = {
+            "user_id": id,
+            "provider": provider
+            }
+        )
+
+        return user
+
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+
+async def add_user( data: UserinDB, provider_data = None):
     try:
         user =   await prisma.users.create(data={
         'identifier': data.identifier,
         'email': data.email,
         'hashed_pw': data.hashed_pw,
         'provider': data.provider,
-        'provider_id': data.provider_id,
         'image': data.image
+        })
 
-    })
+        if provider_data:
+            await add_user_identity(user.id, data, provider_data)
+       
+
         return user.id
 
     except Exception as e:

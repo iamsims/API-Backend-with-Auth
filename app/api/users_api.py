@@ -17,7 +17,7 @@ from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPT
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 from app.auth.jwt_handler import create_access_token, decodeJWT
 from app.auth.password_handler import get_password_hash, verify_password
-from app.controllers.db import add_blacklist_token, create_credit_for_user, add_user, get_user, get_user_by_id, is_token_blacklisted
+from app.controllers.db import add_blacklist_token, add_user_identity, create_credit_for_user, add_user, get_user, get_user_by_id, get_user_identity_by_provider, is_token_blacklisted
 
 
 from app.models.users import UserinDB
@@ -75,6 +75,7 @@ async def login(provider: str, request: Request, state : str = None,redirect_url
 async def token(request: Request, response: Response):
     try:
         provider = request.path_params['provider']
+        user_info = None
         match provider:
             case "google":
                 access_token = await get_google_token(request)
@@ -82,10 +83,12 @@ async def token(request: Request, response: Response):
                 data = UserinDB(
                     identifier = user_email,
                     email = user_email,
-                    provider = "google",
+                    provider = provider,
                     provider_id = provider_id, 
                     image = user_image
                 )
+
+                user_info = access_token['userinfo']
                 
             
             case "github":
@@ -95,18 +98,26 @@ async def token(request: Request, response: Response):
                 data = UserinDB(
                     identifier = username,
                     email = user_email,
-                    provider = "github",
+                    provider = provider,
                     provider_id = provider_id, 
                     image = user_image
                 )
+
+                user_info = user_info
 
             case _:
                 raise PROVIDER_EXCEPTION
             
         user = await get_user(data) 
+
         if not user:
-            id = await initialize_user(data)
+            id = await initialize_user(data, user_info)
         else:
+            if user.provider != provider:
+                user_identity = await get_user_identity_by_provider(user.id, provider)
+                if not user_identity:
+                    await add_user_identity(user.id, data, user_info)
+
             id = user.id
 
         local_token = create_access_token(data={"id": id})
@@ -126,20 +137,19 @@ async def token(request: Request, response: Response):
         )
     
     except DATABASE_EXCEPTION as e:
+        print(e)
         raise DATABASE_EXCEPTION
     
-    except DATABASE_DOWN_EXCEPTION as e:
-        raise DATABASE_DOWN_EXCEPTION
-
     except Exception as e:
+        print(e)
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail= "Exception in getting token"
         )
 
     
-async def initialize_user( data):
-    id = await add_user(data)
+async def initialize_user( data, provider_data):
+    id = await add_user(data, provider_data)
     initial_credit = 1000
     await create_credit_for_user( id, initial_credit)
     return id 
@@ -320,7 +330,6 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
         profile = {
             "identifier": data.identifier,
             "provider": data.provider,
-            "provider_id": data.provider_id,
             "email": data.email,
             "image": data.image
         }
