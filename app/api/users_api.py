@@ -148,7 +148,7 @@ async def token(request: Request, response: Response):
         )
 
     
-async def initialize_user( data, provider_data):
+async def initialize_user( data, provider_data = None):
     id = await add_user(data, provider_data)
     initial_credit = 1000
     await create_credit_for_user( id, initial_credit)
@@ -164,7 +164,7 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
         if user:
             raise ALREADY_REGISTERED_EXCEPTION
         
-        id = await initialize_user(data)
+        id = await initialize_user(data, None)
         
         access_token = create_access_token(
             data={"id": id},

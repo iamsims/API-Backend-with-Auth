@@ -16,10 +16,6 @@ SESSION_SECRET_KEY = config('SESSION_SECRET_KEY') or None
 if SESSION_SECRET_KEY is None:
     raise 'Missing SESSION_SECRET_KEY'
 
-KUBER_SERVER = config('KUBER_SERVER') or None
-if KUBER_SERVER is None:
-    raise 'Missing KUBER_SERVER'
-
 CORS_DOMAINS= config('CORS_DOMAINS') or None
 if CORS_DOMAINS is None:
     raise 'Missing CORS_DOMAINS'
@@ -51,15 +47,11 @@ async def startup_event():
         print("Error during startup")
         sys.exit(1)
     
-    client = httpx.AsyncClient(base_url=KUBER_SERVER)  # this is the other server
-    app.state.client = client
 
 
 @app.on_event('shutdown')
 async def shutdown_event():
     await prisma.disconnect()
 
-    client = app.state.client
-    await client.aclose()
 
 
