@@ -149,9 +149,8 @@ async def get_api_keys(id : int):
             if key.expiration_date and key.expiration_date < now:
                 await delete_api_key(key.key)
                 keys.remove(key)
-        
-        keys = [key.key for key in keys]
 
+        
         return keys
     
     except Exception as e:
