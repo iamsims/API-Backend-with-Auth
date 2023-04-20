@@ -1,2 +1,7 @@
 from prisma import Prisma
-prisma = Prisma()
+from .config import DatabaseConfig
+prisma = Prisma(
+    datasource={
+        'url': DatabaseConfig.url,
+    },
+)

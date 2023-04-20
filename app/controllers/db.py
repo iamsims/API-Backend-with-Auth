@@ -32,6 +32,7 @@ async def get_user( data: UserinDB):
 
 async def add_user_identity(id , data: UserinDB, provider_data):
     try:
+        print(provider_data)
         jsondata = json.dumps(provider_data)
         identity = await prisma.user_identities.create(data={
             "user_id": id,
@@ -81,19 +82,35 @@ async def add_user( data: UserinDB, provider_data = None):
         print(e)
         raise DATABASE_EXCEPTION
 
-async def create_credit_for_user( id : int, credit :int):
+async def create_signup_credit_for_user( id : int, credit :int, provider : str):
+    provider_data = {
+            'signup_provider': provider            
+            }
+    
+    jsondata = json.dumps(provider_data)
     try:
-        await prisma.credit_tracking.create(
+        credit_initial_purchase = await prisma.credit_purchase.create(
             data={
             "user_id": id,
-            "credit": credit,
-        })
+            "credit_amount": credit,
+            "created_date" : math.floor(time.time()*1000), 
+            "payment_details" :  jsondata,
+            "payment_method": "Beta Tester Pack"
+            }
+        )
+
+        await prisma.credit_tracking.create(
+            data = {
+            "credit": credit_initial_purchase.credit_amount,
+            "user_id": id 
+            }
+        )
 
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION    
 
-async def is_token_blacklisted( id):
+async def is_token_blacklisted(id):
     try:
         token = await prisma.blacklist.find_unique(
             where={
@@ -109,7 +126,7 @@ async def is_token_blacklisted( id):
         raise DATABASE_EXCEPTION
  
 
-async def get_user_by_id( id : int):
+async def get_user_by_id(id : int):
     try:
         user = await prisma.users.find_unique(
             where={
@@ -123,7 +140,7 @@ async def get_user_by_id( id : int):
         raise DATABASE_EXCEPTION    
 
 
-async def add_blacklist_token( id : int):
+async def add_blacklist_token(id : int):
     try:
         await prisma.blacklist.create(
             data ={
@@ -149,6 +166,7 @@ async def get_api_keys(id : int):
             if key.expiration_date and key.expiration_date < now:
                 await delete_api_key(key.key)
                 keys.remove(key)
+
 
         
         return keys
@@ -319,3 +337,33 @@ async def decrement_credit_for_user(id : int, cost :int):
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION    
+    
+
+async def get_credit_purchase_history(id:int):
+    try:
+       credit_purchase_history = await prisma.credit_purchase.find_many(
+           where={
+               "user_id": id,
+           },
+           order={
+           "created_date": "desc"
+           
+           }
+       )
+
+       credit_purchase_history_filtered = [
+           {
+           "credit_amount": entry.credit_amount,
+           "created_date" : entry.created_date,
+           "payment_method" : entry.payment_method,
+           "payment_details": entry.payment_details
+           } for entry in credit_purchase_history
+       ]
+       
+       return credit_purchase_history_filtered
+
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION   
+
+

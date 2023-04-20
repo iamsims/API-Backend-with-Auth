@@ -18,7 +18,7 @@ from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPT
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 from app.auth.jwt_handler import create_access_token, decodeJWT
 from app.auth.password_handler import get_password_hash, verify_password
-from app.controllers.db import add_blacklist_token, add_user_identity, create_credit_for_user, add_user, get_user, get_user_by_id, get_user_identity_by_provider, is_token_blacklisted
+from app.controllers.db import add_blacklist_token, add_user_identity, create_signup_credit_for_user, add_user, get_user, get_user_by_id, get_user_identity_by_provider, is_token_blacklisted
 from app.api.api import create_api_key
 
 from app.models.users import UserinDB
