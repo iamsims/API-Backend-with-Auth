@@ -152,7 +152,7 @@ async def token(request: Request, response: Response):
 async def initialize_user( data, provider_data = None):
     id = await add_user(data, provider_data)
     await create_api_key("default", id)
-    initial_credit = 1000
+    initial_credit = 20000
     await create_credit_for_user( id, initial_credit)
     return id 
 
