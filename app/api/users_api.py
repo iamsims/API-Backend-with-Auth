@@ -152,8 +152,8 @@ async def token(request: Request, response: Response):
 async def initialize_user( data, provider_data = None):
     id = await add_user(data, provider_data)
     await create_api_key("default", id)
-    initial_credit = 20000
-    await create_credit_for_user( id, initial_credit)
+    initial_credit = 1000
+    await create_signup_credit_for_user( id, initial_credit, data.provider)
     return id 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
