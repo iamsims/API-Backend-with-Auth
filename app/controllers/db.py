@@ -337,3 +337,33 @@ async def decrement_credit_for_user(id : int, cost :int):
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION    
+    
+
+async def get_credit_purchase_history(id:int):
+    try:
+       credit_purchase_history = await prisma.credit_purchase.find_many(
+           where={
+               "user_id": id,
+           },
+           order={
+           "created_date": "desc"
+           
+           }
+       )
+
+       credit_purchase_history_filtered = [
+           {
+           "credit_amount": entry.credit_amount,
+           "created_date" : entry.created_date,
+           "payment_method" : entry.payment_method,
+           "payment_details": entry.payment_details
+           } for entry in credit_purchase_history
+       ]
+       
+       return credit_purchase_history_filtered
+
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION   
+
+

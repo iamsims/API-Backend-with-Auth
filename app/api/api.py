@@ -11,9 +11,10 @@ from app.auth.api_key import generate_api_key
 
 from app.constants.exceptions import  CREDENTIALS_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, DOESNT_EXIST_EXCEPTION, NOT_AUTHORIZED_EXCEPTION
 from app.api.authenticate import get_current_user_id_http
-from app.controllers.db import add_api_key, delete_api_key, get_api_keys, get_credit_for_user, get_logs, get_user_id_by_api_key
+from app.controllers.db import add_api_key, delete_api_key, get_api_keys, get_credit_for_user, get_credit_purchase_history, get_logs, get_user_id_by_api_key
 
 router = APIRouter()
+
 
 
 
@@ -120,8 +121,22 @@ async def get_credit_usage(request : Request, api_key : str = None, page: int = 
     except DATABASE_EXCEPTION :
         raise DATABASE_EXCEPTION
     
-    except DATABASE_DOWN_EXCEPTION:
-        raise DATABASE_DOWN_EXCEPTION
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in getting user credit"
+        )
+    
+
+@router.get("/credit/purchases")
+async def get_credit_purchase(request:Request, id: int = Depends(get_current_user_id_http) ):
+    try:
+        history = await get_credit_purchase_history(id)
+        return history 
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
     
     except Exception as e:
         print(e)
@@ -129,6 +144,8 @@ async def get_credit_usage(request : Request, api_key : str = None, page: int = 
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in getting user credit"
         )
+    
+
     
 
 
