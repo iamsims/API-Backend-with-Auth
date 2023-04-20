@@ -89,20 +89,28 @@ async def create_signup_credit_for_user( id : int, credit :int, provider : str):
     
     jsondata = json.dumps(provider_data)
     try:
-        await prisma.credit_purchase.create(
+        credit_initial_purchase = await prisma.credit_purchase.create(
             data={
             "user_id": id,
-            "credit": credit,
+            "credit_amount": credit,
             "created_date" : math.floor(time.time()*1000), 
             "payment_details" :  jsondata,
-            "payment_method": "Startup Pack"
-        })
+            "payment_method": "Beta Tester Pack"
+            }
+        )
+
+        await prisma.credit_tracking.create(
+            data = {
+            "credit": credit_initial_purchase.credit_amount,
+            "user_id": id 
+            }
+        )
 
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION    
 
-async def is_token_blacklisted( id):
+async def is_token_blacklisted(id):
     try:
         token = await prisma.blacklist.find_unique(
             where={
@@ -118,7 +126,7 @@ async def is_token_blacklisted( id):
         raise DATABASE_EXCEPTION
  
 
-async def get_user_by_id( id : int):
+async def get_user_by_id(id : int):
     try:
         user = await prisma.users.find_unique(
             where={
@@ -132,7 +140,7 @@ async def get_user_by_id( id : int):
         raise DATABASE_EXCEPTION    
 
 
-async def add_blacklist_token( id : int):
+async def add_blacklist_token(id : int):
     try:
         await prisma.blacklist.create(
             data ={
@@ -296,7 +304,7 @@ async def get_logs(user_id: str, api_key : str =None, page: int = 1, page_size: 
 
 async def get_credit_for_user(id : int):
     try:
-        credit_entry = await prisma.credit_purchase.find_unique(
+        credit_entry = await prisma.credit_tracking.find_unique(
             where={
                 "user_id": id,
             }
@@ -310,13 +318,13 @@ async def get_credit_for_user(id : int):
 
 async def decrement_credit_for_user(id : int, cost :int):
     try:
-        credit_entry = await prisma.credit_purchase.find_unique(
+        credit_entry = await prisma.credit_tracking.find_unique(
             where={
                 "user_id": id,
             }
         )
         credit_entry.credit -= cost
-        await prisma.credit_purchase.update(
+        await prisma.credit_tracking.update(
             where={
                 "user_id": id,
             },
