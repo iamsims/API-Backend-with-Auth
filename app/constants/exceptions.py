@@ -60,6 +60,13 @@ class CREDIT_NOT_ENOUGH_EXCEPTION(HTTPException):
         self.detail = "You don't have enough credit to perform this request"
         super().__init__(status_code=self.status_code, detail=self.detail)
 
+class TOO_MANY_SESSIONS_EXCEPTION(HTTPException):
+    def __init__(self):
+        self.status_code = status.HTTP_400_BAD_REQUEST
+        self.detail = "TOO MANY SESSIONS IN THE SERVER"
+        super().__init__(status_code=self.status_code, detail=self.detail)
+
+
 class ALREADY_REGISTERED_EXCEPTION(HTTPException):
     def __init__(self):
         self.status_code = status.HTTP_400_BAD_REQUEST
