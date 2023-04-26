@@ -189,9 +189,15 @@ async def get_user_id_by_api_key(api_key : str):
         print(e)
         raise DATABASE_EXCEPTION
 
-async def add_log_entry(start_time, end_time, ip_address, cost, user_id, api_key = None, endpoint = None, method = None, status_code = None, request_headers = None, response_headers = None):
+async def add_log_entry(start_time, user_id, ip_address, end_time = None, request_headers = None, cost = 0, api_key = None, endpoint = None, method = None, status_code = None,  response_headers = None):
     try:
-        await prisma.logs.create(
+        if request_headers is None:
+            request_headers = {}
+
+        if response_headers is None:
+            response_headers = {}
+
+        log = await prisma.logs.create(
             data={
             "start_time": start_time,
             "end_time": end_time,
@@ -202,16 +208,54 @@ async def add_log_entry(start_time, end_time, ip_address, cost, user_id, api_key
             "endpoint": endpoint,
             "method": method,
             "status_code": status_code,
-            "request_headers": request_headers,
-            "response_headers": response_headers
+            "request_headers": json.dumps(dict(request_headers)),
+            "response_headers": json.dumps(dict(response_headers))
 
         })
+        # 
+        return log.id
+     
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+    
+async def increment_cost_for_log_entry(log_id, cost):
+    try:
+        await prisma.logs.update(
+            where={
+                "id": log_id,
+            },
+            data={
+                "cost": {
+                "increment": cost
+                }
+            }
+        )
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION
 
+async def complete_log_entry(log_id, end_time, response_headers = None):
+    try:
+        if response_headers is None:
+            response_headers = {}
 
+        log = await prisma.logs.update(
+            where={
+                "id": log_id,
+            },
+            data={
+                "end_time": end_time,
+                "response_headers": json.dumps(dict(response_headers))
+            }
+        )
 
+        print(log.end_time)
+
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+    
 async def add_api_key( id : int, api_key : str, name : str = None):
     try:
         created = math.floor(time.time()*1000) # in milliseconds
