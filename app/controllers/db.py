@@ -250,7 +250,6 @@ async def complete_log_entry(log_id, end_time, response_headers = None):
             }
         )
 
-        print(log.end_time)
 
     except Exception as e:
         print(e)
@@ -299,7 +298,7 @@ async def get_logs(user_id: str, api_key : str =None, page: int = 1, page_size: 
                 skip=(page - 1) * page_size,
                 take=page_size,
                 order={
-                    "end_time": "desc"
+                    "start_time": "desc"
                 }
             )
             count = await prisma.logs.count(
