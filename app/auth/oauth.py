@@ -5,17 +5,26 @@ from starlette.config import Config
 from decouple import config
 
 # OAuth settings
-GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID') or None
-GOOGLE_CLIENT_SECRET =config('GOOGLE_CLIENT_SECRET') or None
-if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
-    raise BaseException('Missing env variables for google auth')
+
+GOOGLE_CLIENT_ID = None
+GOOGLE_CLIENT_SECRET = None
+GITHUB_CLIENT_ID = None
+GITHUB_CLIENT_SECRET = None 
+
+try:
+    GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID') 
+    GOOGLE_CLIENT_SECRET =config('GOOGLE_CLIENT_SECRET') 
+
+    GITHUB_CLIENT_ID = config('GITHUB_CLIENT_ID')
+    GITHUB_CLIENT_SECRET =config('GITHUB_CLIENT_SECRET')
+
+except:
+    if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
+        raise BaseException('Missing env variables for google auth')
 
 
-# OAuth settings
-GITHUB_CLIENT_ID = config('GITHUB_CLIENT_ID') or None
-GITHUB_CLIENT_SECRET =config('GITHUB_CLIENT_SECRET') or None
-if GITHUB_CLIENT_ID is None or GITHUB_CLIENT_SECRET is None:
-    raise BaseException('Missing env variables for github auth')
+    if GITHUB_CLIENT_ID is None or GITHUB_CLIENT_SECRET is None:
+        raise BaseException('Missing env variables for github auth')
 
 
 # Set up oauth

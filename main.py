@@ -11,18 +11,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.prisma import prisma
 
+SESSION_SECRET_KEY = None
+CORS_DOMAINS = None
 
+try:
+    SESSION_SECRET_KEY = config('SESSION_SECRET_KEY')
+    CORS_DOMAINS= config('CORS_DOMAINS')
+    CORS_DOMAINS = CORS_DOMAINS.split(',')
 
+except:
+    if SESSION_SECRET_KEY is None:
+        raise 'Missing SESSION_SECRET_KEY'
 
-SESSION_SECRET_KEY = config('SESSION_SECRET_KEY') or None
-if SESSION_SECRET_KEY is None:
-    raise 'Missing SESSION_SECRET_KEY'
+    if CORS_DOMAINS is None:
+        raise 'Missing CORS_DOMAINS'
 
-CORS_DOMAINS= config('CORS_DOMAINS') or None
-if CORS_DOMAINS is None:
-    raise 'Missing CORS_DOMAINS'
-
-CORS_DOMAINS = CORS_DOMAINS.split(',')
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)

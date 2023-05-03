@@ -6,8 +6,20 @@ import time
 from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
 
 
-JWT_SECRET = config('JWT_SECRET')
-JWT_ALGORITHM = config('JWT_ALGORITHM')
+JWT_ALGORITHM= None
+JWT_SECRET = None 
+
+try:
+    JWT_SECRET = config('JWT_SECRET')
+    JWT_ALGORITHM = config('JWT_ALGORITHM')
+
+except:
+    if JWT_SECRET is None:
+        raise BaseException('Missing env variables for JWT_SECRET')
+    if JWT_ALGORITHM is None:
+        raise BaseException('Missing env variables for JWT_ALGORITHM')
+    
+
 
 
 def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
