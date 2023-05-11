@@ -34,29 +34,23 @@ async def create_snippet(snippet: Snippet, user_id: int) -> int:
         raise DATABASE_EXCEPTION
  
 
-async def update_snippet(snippet_id: int, snippet: Snippet) -> bool:
+async def update_snippet(snippet_id: int, snippet: Snippet) :
     try:
-        db_snippet = await get_snippet(snippet_id)
-        if not db_snippet:
-            return False
         await prisma.snippet.update(
             where={"id": snippet_id},
             data={"code": snippet.code},
         )
-        return True
+        return 
         
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION
  
 
-async def delete_snippet(snippet_id: int) -> bool:
+async def delete_snippet(snippet_id: int):
     try:
-        db_snippet = await get_snippet(snippet_id)
-        if not db_snippet:
-            return False
         await prisma.snippet.delete(where={"id": snippet_id})
-        return True
+        return 
         
     except Exception as e:
         print(e)
