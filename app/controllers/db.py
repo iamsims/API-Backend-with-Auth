@@ -1,3 +1,4 @@
+from ast import List
 import datetime
 import json
 import math
@@ -5,6 +6,61 @@ import time
 from app.constants.exceptions import DATABASE_EXCEPTION
 from app.db.prisma import prisma
 from app.models.users import UserinDB
+from app.models.snippet import Snippet
+
+
+
+async def get_snippet(snippet_id):
+    try:
+        snippet = await prisma.snippet.find_unique(
+            where={"id": snippet_id}
+        )
+        return snippet
+    
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+    
+
+async def create_snippet(snippet: Snippet, user_id: int) -> int:
+    try:
+        db_snippet = await prisma.snippet.create(
+            {"code": snippet.code, "user_id": user_id}
+        )
+        return db_snippet.id
+        
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+ 
+
+async def update_snippet(snippet_id: int, snippet: Snippet) -> bool:
+    try:
+        db_snippet = await get_snippet(snippet_id)
+        if not db_snippet:
+            return False
+        await prisma.snippet.update(
+            where={"id": snippet_id},
+            data={"code": snippet.code},
+        )
+        return True
+        
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+ 
+
+async def delete_snippet(snippet_id: int) -> bool:
+    try:
+        db_snippet = await get_snippet(snippet_id)
+        if not db_snippet:
+            return False
+        await prisma.snippet.delete(where={"id": snippet_id})
+        return True
+        
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
 
 
 async def get_user( data: UserinDB):
