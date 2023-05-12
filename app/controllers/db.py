@@ -25,7 +25,7 @@ async def get_snippet(snippet_id):
 async def create_snippet(snippet: Snippet, user_id: int) -> int:
     try:
         db_snippet = await prisma.snippet.create(
-            {"code": snippet.code, "user_id": user_id}
+            {"code": snippet.code, "user_id": user_id, "lang": snippet.lang}
         )
         return db_snippet.id
         
