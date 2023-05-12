@@ -1,5 +1,14 @@
 from pydantic import BaseModel
 
-class Snippet(BaseModel):
+class CreateSnippet(BaseModel):
     code : str
-    lang : str or None = None
+    lang : str 
+    name : str
+
+
+class UpdateSnippet(BaseModel):
+    code: str 
+
+
+class UpdateSnippetName(BaseModel):
+    name : str

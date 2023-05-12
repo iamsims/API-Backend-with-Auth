@@ -6,7 +6,7 @@ import time
 from app.constants.exceptions import DATABASE_EXCEPTION
 from app.db.prisma import prisma
 from app.models.users import UserinDB
-from app.models.snippet import Snippet
+from app.models.snippet import UpdateSnippet, CreateSnippet, UpdateSnippetName
 
 
 
@@ -22,10 +22,10 @@ async def get_snippet(snippet_id):
         raise DATABASE_EXCEPTION
     
 
-async def create_snippet(snippet: Snippet, user_id: int) -> int:
+async def create_snippet(snippet: CreateSnippet, user_id: int) -> int:
     try:
         db_snippet = await prisma.snippet.create(
-            {"code": snippet.code, "user_id": user_id, "lang": snippet.lang}
+            {"code": snippet.code, "user_id": user_id, "lang": snippet.lang, "name": snippet.name}
         )
         return db_snippet.id
         
@@ -34,18 +34,29 @@ async def create_snippet(snippet: Snippet, user_id: int) -> int:
         raise DATABASE_EXCEPTION
  
 
-async def update_snippet(snippet_id: int, snippet: Snippet) :
+async def update_snippet(snippet_id: int, snippet: UpdateSnippet) :
     try:
-        await prisma.snippet.update(
-            where={"id": snippet_id},
-            data={"code": snippet.code},
+        return await prisma.snippet.update(
+        where={"id": snippet_id},
+        data={"code": snippet.code},
         )
-        return 
         
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION
- 
+
+
+async def update_snippet_name(snippet_id: int, snippet: UpdateSnippetName) :
+    try:
+        return await prisma.snippet.update(
+        where={"id": snippet_id},
+        data={"name": snippet.name},
+        )
+        
+    except Exception as e:
+        print(e)
+        raise DATABASE_EXCEPTION
+
 
 async def delete_snippet(snippet_id: int):
     try:
