@@ -17,10 +17,10 @@ router = APIRouter()
 
 
 
-
 @router.get('/api-keys')
-async def api_keys(request : Request, id:int = Depends(get_current_user_id_http)):
+async def api_keys(request : Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         api_keys = await get_api_keys( id)
         return api_keys
     
@@ -38,8 +38,9 @@ async def api_keys(request : Request, id:int = Depends(get_current_user_id_http)
         )
 
 @router.delete('/api-key')
-async def delete_api_keys(request : Request, api_key: str, id:int = Depends(get_current_user_id_http)):
+async def delete_api_keys(request : Request, api_key: str, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         id_api_key = await get_user_id_by_api_key( api_key)
         if id_api_key is None:
             raise DOESNT_EXIST_EXCEPTION("API key doesn't exist")
@@ -48,6 +49,8 @@ async def delete_api_keys(request : Request, api_key: str, id:int = Depends(get_
             raise NOT_AUTHORIZED_EXCEPTION
         
         await delete_api_key( api_key)
+        response = JSONResponse(content={"result": True}, status_code=200)
+        
         return JSONResponse(content={"result": True}, status_code=200)
     
     except DATABASE_EXCEPTION:
@@ -70,8 +73,9 @@ async def delete_api_keys(request : Request, api_key: str, id:int = Depends(get_
         )
 
 @router.post("/api-keys/generate")
-async def create_api_key( name : str = None, id :int = Depends(get_current_user_id_http)):
+async def create_api_key( name : str = None, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         api_key = generate_api_key()
         await add_api_key( id, api_key, name)
         return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
@@ -92,8 +96,9 @@ async def create_api_key( name : str = None, id :int = Depends(get_current_user_
 
 
 @router.get("/credit")
-async def get_credit(request : Request, id: int = Depends(get_current_user_id_http)):
+async def get_credit(request : Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         credit = await get_credit_for_user( id)
         return credit
     
@@ -130,8 +135,9 @@ async def get_credit_usage(request : Request, api_key : str = None, page: int = 
     
 
 @router.get("/credit/purchases")
-async def get_credit_purchase(request:Request, id: int = Depends(get_current_user_id_http) ):
+async def get_credit_purchase(request:Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         history = await get_credit_purchase_history(id)
         return history 
     

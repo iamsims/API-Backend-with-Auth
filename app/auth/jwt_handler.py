@@ -57,3 +57,8 @@ def verify_jwt(jwtoken : str):
     if payload:
         isTokenValid = True
     return isTokenValid
+
+
+def set_cookie(response: dict, access_token: str, refresh_token : str):
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure= True, samesite="none", expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+    response.set_cookie(key= "refresh_token", value=refresh_token, httponly=True, secure= True, samesite="none", expires=REFRESH_TOKEN_EXPIRE_MINUTES*60)
