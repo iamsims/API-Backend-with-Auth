@@ -8,6 +8,7 @@ from fastapi import Request
 
 from decouple import config
 from app.auth.api_key import generate_api_key
+from app.auth.jwt_handler import set_cookie
 
 from app.constants.exceptions import  CREDENTIALS_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, DOESNT_EXIST_EXCEPTION, NOT_AUTHORIZED_EXCEPTION
 from app.api.authenticate import get_current_user_id_http
@@ -22,7 +23,12 @@ async def api_keys(request : Request, id_and_tokens:tuple = Depends(get_current_
     try:
         id, access_token, refresh_token = id_and_tokens
         api_keys = await get_api_keys( id)
-        return api_keys
+        api_keys = [dict(api_key) for api_key in api_keys]
+        response = JSONResponse(content = api_keys, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
@@ -50,8 +56,11 @@ async def delete_api_keys(request : Request, api_key: str, id_and_tokens:tuple =
         
         await delete_api_key( api_key)
         response = JSONResponse(content={"result": True}, status_code=200)
-        
-        return JSONResponse(content={"result": True}, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
+
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
@@ -78,7 +87,11 @@ async def create_api_key( name : str = None, id_and_tokens:tuple = Depends(get_c
         id, access_token, refresh_token = id_and_tokens
         api_key = generate_api_key()
         await add_api_key( id, api_key, name)
-        return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
+        response = JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
@@ -100,7 +113,10 @@ async def get_credit(request : Request, id_and_tokens:tuple = Depends(get_curren
     try:
         id, access_token, refresh_token = id_and_tokens
         credit = await get_credit_for_user( id)
-        return credit
+        response = JSONResponse(content=credit, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+        return response
     
     except DATABASE_EXCEPTION :
         raise DATABASE_EXCEPTION
@@ -117,10 +133,17 @@ async def get_credit(request : Request, id_and_tokens:tuple = Depends(get_curren
 
 
 @router.get("/credit/usage")
-async def get_credit_usage(request : Request, api_key : str = None, page: int = 1, page_size: int = 10, id: int = Depends(get_current_user_id_http)):
+async def get_credit_usage(request : Request, api_key : str = None, page: int = 1, page_size: int = 10, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         paginated_logs = await get_logs( id , api_key, page, page_size)
-        return paginated_logs
+        paginated_logs["logs"] = [dict(log) for log in paginated_logs["logs"]]
+        response = JSONResponse(content=paginated_logs, status_code=200)
+
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
         
     
     except DATABASE_EXCEPTION :
@@ -139,7 +162,12 @@ async def get_credit_purchase(request:Request, id_and_tokens:tuple = Depends(get
     try:
         id, access_token, refresh_token = id_and_tokens
         history = await get_credit_purchase_history(id)
-        return history 
+        response = JSONResponse(content=history, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
+        
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION

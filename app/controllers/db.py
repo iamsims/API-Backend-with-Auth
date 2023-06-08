@@ -244,7 +244,9 @@ async def get_user_id_by_api_key(api_key : str):
                 "key": api_key,
             }
         )
-        return key.user_id
+        if key:
+            return key.user_id
+        return None
       
     except Exception as e:
         print(e)
