@@ -181,5 +181,31 @@ async def get_credit_purchase(request:Request, id_and_tokens:tuple = Depends(get
     
 
     
+    
 
+@router.get('/refresh')
+async def refresh(request:Request, id_tokens: tuple = Depends(get_current_user_id_http)):
+    try:
+        _, access_token, refresh_token = id_tokens
+        response = JSONResponse(content={"result": True}, status_code=200)
+        if refresh_token and access_token:
+            set_cookie(response, access_token, refresh_token)
+            print("Refreshed token")
+        else:
+            print("Refresh not required")
+
+        return response
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in refreshing token"
+        )
 
