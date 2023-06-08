@@ -10,22 +10,26 @@ from app.controllers.db import get_user_by_id, is_token_blacklisted
 async def get_current_user_token(request:Request, access_token: Union[str, None] = Cookie(None), refresh_token: Union[str, None] = Cookie(None)):
     if not access_token or not refresh_token:
         raise COOKIE_EXCEPTION
-    _ = await get_current_user_id(access_token, refresh_token, validate_only=True)
+    _ = await get_current_user_id(access_token, refresh_token, refresh_tokens_generate=False)
     return access_token, refresh_token
 
 
 
 
-async def get_current_user_id(access_token: str, refresh_token: str, validate_only: bool = False):
-    if not access_token or not refresh_token:
+async def get_current_user_id(access_token: str, refresh_token: str , refresh_tokens_generate: bool = True):
+    if not access_token and not refresh_token:
         raise COOKIE_EXCEPTION
-        
-    payload = decodeJWT(token=access_token)
+    
+    payload = None
     new_access_token = None
     new_refresh_token = None
 
+    if access_token:    
+        payload = decodeJWT(token=access_token)
 
+    # if access token is invalid, check if refresh token is valid
     if payload is None:
+        print("Access token is invalid")
         if await is_token_blacklisted(refresh_token):
             print("Token is blacklisted")
             raise CREDENTIALS_EXCEPTION
@@ -41,12 +45,12 @@ async def get_current_user_id(access_token: str, refresh_token: str, validate_on
             raise CREDENTIALS_EXCEPTION
 
         user = await get_user_by_id(id)
-        if user and not validate_only:
+        if user and refresh_tokens_generate:
             new_access_token = create_access_token(data = {"id": id})
             new_refresh_token = create_refresh_token(data = {"id": id})
             return id, new_access_token, new_refresh_token
-        
-        elif user and validate_only:
+
+        elif user and not refresh_tokens_generate:
             return id, new_access_token, new_refresh_token
 
     else:
@@ -57,18 +61,18 @@ async def get_current_user_id(access_token: str, refresh_token: str, validate_on
             raise CREDENTIALS_EXCEPTION
     
         user = await get_user_by_id(id)
-        if user and not validate_only:
-            return id, new_access_token, new_refresh_token
-        
-        elif user and validate_only:
+        if user:
             return id, new_access_token, new_refresh_token
     
     raise CREDENTIALS_EXCEPTION
 
 
 async def get_current_user_id_ws( access_token: str, refresh_token: str):
-    return await get_current_user_id(access_token, refresh_token)
+    return await get_current_user_id(access_token, refresh_token, refresh_tokens_generate=False)
 
 
 async def get_current_user_id_http(request: Request, access_token: Union[str, None] = Cookie(None), refresh_token: Union[str, None] = Cookie(None)):
     return await get_current_user_id(access_token, refresh_token)
+
+
+
