@@ -16,14 +16,14 @@ from app.api.authenticate import get_current_user_id_http, get_current_user_toke
 
 from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_NOT_ENOUGH_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
-from app.auth.jwt_handler import create_access_token, decodeJWT
+from app.auth.jwt_handler import create_access_token, create_refresh_token, decodeJWT, set_cookie
 from app.auth.password_handler import get_password_hash, verify_password
 from app.controllers.db import add_blacklist_token, add_user_identity, create_signup_credit_for_user, add_user, get_user, get_user_by_id, get_user_identity_by_provider, is_token_blacklisted
 from app.api.api import create_api_key
 
 from app.models.users import UserinDB
 
-from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES
+from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
 from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
 
 
@@ -122,8 +122,9 @@ async def token(request: Request, response: Response):
             id = user.id
 
         local_token = create_access_token(data={"id": id})
-        response = await get_user_profile(request, id)
-        response.set_cookie(key="access_token", value=local_token, httponly=True, secure= True, samesite="none", expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)
+        refresh_token = create_refresh_token(data={"id": id})
+        id_and_tokens = (id, local_token, refresh_token)
+        response = await get_user_profile(request, id_and_tokens)
         return response
     
 
@@ -168,14 +169,13 @@ async def signup(request:Request, form : OAuth2PasswordRequestForm = Depends()):
         
         id = await initialize_user(data, None)
         
-        access_token = create_access_token(
-            data={"id": id},
-        )
 
-        response = await get_user_profile(request, id)
-        response.set_cookie(key="access_token", value=access_token, httponly=True, secure= True, samesite="none", expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)   
-        print(response.headers)     
+        local_token = create_access_token(data={"id": id})
+        refresh_token = create_refresh_token(data={"id": id})
+        id_and_tokens = (id, local_token, refresh_token)
+        response = await get_user_profile(request, id_and_tokens)
         return response
+
     
     except ALREADY_REGISTERED_EXCEPTION:
         raise ALREADY_REGISTERED_EXCEPTION
@@ -210,14 +210,14 @@ async def login_for_access_token(request:Request, form : OAuth2PasswordRequestFo
 
         if not verify_password(form.password, hashed_pw):
             raise INCORRECT_PASSWORD_EXCEPTION
-        access_token = create_access_token(
-            data={"id": id},
-        )
-        print(id)
+        
+        local_token = create_access_token(data={"id": id})
+        refresh_token = create_refresh_token(data={"id": id})
+        id_and_tokens = (id, local_token, refresh_token)
+        response = await get_user_profile(request, id_and_tokens)
 
-        response = await get_user_profile(request, id)
-        response.set_cookie(key="access_token", value=access_token, httponly=True, secure= True, samesite="none", expires=ACCESS_TOKEN_EXPIRE_MINUTES*60)        
         return response
+
     
     except INCORRECT_USERNAME_EXCEPTION:
         raise INCORRECT_USERNAME_EXCEPTION
@@ -240,11 +240,13 @@ async def login_for_access_token(request:Request, form : OAuth2PasswordRequestFo
 
 
 @router.get('/logout')
-async def logout(request:Request, token: str = Depends(get_current_user_token)):
+async def logout(request:Request, tokens: tuple = Depends(get_current_user_token)):
     try :
-        await add_blacklist_token(token)
+        _, refresh_token = tokens
+        await add_blacklist_token(refresh_token)
         response = JSONResponse(content={"result": True}, status_code=200)
         response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
         return response 
     
     except DATABASE_EXCEPTION:
@@ -261,9 +263,10 @@ async def logout(request:Request, token: str = Depends(get_current_user_token)):
         )
 
 @router.get('/profile')
-async def get_user_profile(request:Request, id :int = Depends(get_current_user_id_http)):
+async def get_user_profile(request:Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
 
     try:
+        id, access_token, refresh_token = id_and_tokens
 
         data =await get_user_by_id(id)
         profile = {
@@ -272,7 +275,12 @@ async def get_user_profile(request:Request, id :int = Depends(get_current_user_i
             "email": data.email,
             "image": data.image
         }
-        return JSONResponse(content=profile, status_code=200)
+        response = JSONResponse(content=profile, status_code=200)
+
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION

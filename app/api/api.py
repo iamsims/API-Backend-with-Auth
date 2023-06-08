@@ -8,6 +8,7 @@ from fastapi import Request
 
 from decouple import config
 from app.auth.api_key import generate_api_key
+from app.auth.jwt_handler import set_cookie
 
 from app.constants.exceptions import  CREDENTIALS_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, DOESNT_EXIST_EXCEPTION, NOT_AUTHORIZED_EXCEPTION
 from app.api.authenticate import get_current_user_id_http
@@ -17,12 +18,17 @@ router = APIRouter()
 
 
 
-
 @router.get('/api-keys')
-async def api_keys(request : Request, id:int = Depends(get_current_user_id_http)):
+async def api_keys(request : Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         api_keys = await get_api_keys( id)
-        return api_keys
+        api_keys = [dict(api_key) for api_key in api_keys]
+        response = JSONResponse(content = api_keys, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
@@ -38,8 +44,9 @@ async def api_keys(request : Request, id:int = Depends(get_current_user_id_http)
         )
 
 @router.delete('/api-key')
-async def delete_api_keys(request : Request, api_key: str, id:int = Depends(get_current_user_id_http)):
+async def delete_api_keys(request : Request, api_key: str, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         id_api_key = await get_user_id_by_api_key( api_key)
         if id_api_key is None:
             raise DOESNT_EXIST_EXCEPTION("API key doesn't exist")
@@ -48,7 +55,12 @@ async def delete_api_keys(request : Request, api_key: str, id:int = Depends(get_
             raise NOT_AUTHORIZED_EXCEPTION
         
         await delete_api_key( api_key)
-        return JSONResponse(content={"result": True}, status_code=200)
+        response = JSONResponse(content={"result": True}, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
+
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
@@ -70,11 +82,16 @@ async def delete_api_keys(request : Request, api_key: str, id:int = Depends(get_
         )
 
 @router.post("/api-keys/generate")
-async def create_api_key( name : str = None, id :int = Depends(get_current_user_id_http)):
+async def create_api_key( name : str = None, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         api_key = generate_api_key()
         await add_api_key( id, api_key, name)
-        return JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
+        response = JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
@@ -92,10 +109,14 @@ async def create_api_key( name : str = None, id :int = Depends(get_current_user_
 
 
 @router.get("/credit")
-async def get_credit(request : Request, id: int = Depends(get_current_user_id_http)):
+async def get_credit(request : Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         credit = await get_credit_for_user( id)
-        return credit
+        response = JSONResponse(content=credit, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+        return response
     
     except DATABASE_EXCEPTION :
         raise DATABASE_EXCEPTION
@@ -112,10 +133,17 @@ async def get_credit(request : Request, id: int = Depends(get_current_user_id_ht
 
 
 @router.get("/credit/usage")
-async def get_credit_usage(request : Request, api_key : str = None, page: int = 1, page_size: int = 10, id: int = Depends(get_current_user_id_http)):
+async def get_credit_usage(request : Request, api_key : str = None, page: int = 1, page_size: int = 10, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         paginated_logs = await get_logs( id , api_key, page, page_size)
-        return paginated_logs
+        paginated_logs["logs"] = [dict(log) for log in paginated_logs["logs"]]
+        response = JSONResponse(content=paginated_logs, status_code=200)
+
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
         
     
     except DATABASE_EXCEPTION :
@@ -130,10 +158,16 @@ async def get_credit_usage(request : Request, api_key : str = None, page: int = 
     
 
 @router.get("/credit/purchases")
-async def get_credit_purchase(request:Request, id: int = Depends(get_current_user_id_http) ):
+async def get_credit_purchase(request:Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
+        id, access_token, refresh_token = id_and_tokens
         history = await get_credit_purchase_history(id)
-        return history 
+        response = JSONResponse(content=history, status_code=200)
+        if access_token and refresh_token:
+            set_cookie(response, access_token, refresh_token)
+
+        return response
+        
     
     except DATABASE_EXCEPTION:
         raise DATABASE_EXCEPTION
@@ -147,5 +181,31 @@ async def get_credit_purchase(request:Request, id: int = Depends(get_current_use
     
 
     
+    
 
+@router.get('/refresh')
+async def refresh(request:Request, id_tokens: tuple = Depends(get_current_user_id_http)):
+    try:
+        _, access_token, refresh_token = id_tokens
+        response = JSONResponse(content={"result": True}, status_code=200)
+        if refresh_token and access_token:
+            set_cookie(response, access_token, refresh_token)
+            print("Refreshed token")
+        else:
+            print("Refresh not required")
+
+        return response
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in refreshing token"
+        )
 
