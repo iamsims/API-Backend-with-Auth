@@ -180,10 +180,9 @@ async def get_credit_purchase(request:Request, id_and_tokens:tuple = Depends(get
         )
     
 
-    
-    
+      
 
-@router.get('/refresh')
+@router.get('/refresh-token')
 async def refresh(request:Request, id_tokens: tuple = Depends(get_current_user_id_http)):
     try:
         _, access_token, refresh_token = id_tokens
