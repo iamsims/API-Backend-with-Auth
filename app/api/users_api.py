@@ -11,6 +11,7 @@ from starlette.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuthError
 from fastapi.security import OAuth2PasswordRequestForm
 from app.api.authenticate import get_current_user_id_http, get_current_user_token
+from app.auth.api_key import generate_api_key
 
 
 
@@ -18,7 +19,7 @@ from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPT
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
 from app.auth.jwt_handler import create_access_token, create_refresh_token, decodeJWT, set_cookie
 from app.auth.password_handler import get_password_hash, verify_password
-from app.controllers.db import add_blacklist_token, add_user_identity, create_signup_credit_for_user, add_user, get_user, get_user_by_id, get_user_identity_by_provider, is_token_blacklisted
+from app.controllers.db import add_api_key, add_blacklist_token, add_user_identity, create_signup_credit_for_user, add_user, get_user, get_user_by_id, get_user_identity_by_provider, is_token_blacklisted
 from app.api.api import create_api_key
 
 from app.models.users import UserinDB
@@ -152,7 +153,8 @@ async def token(request: Request, response: Response):
     
 async def initialize_user( data, provider_data = None):
     id = await add_user(data, provider_data)
-    await create_api_key("default", id)
+    api_key = generate_api_key()
+    await add_api_key( id, api_key, "default")
     initial_credit = 20000
     await create_signup_credit_for_user( id, initial_credit, data.provider)
     return id 
