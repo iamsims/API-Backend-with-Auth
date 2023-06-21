@@ -17,6 +17,11 @@ from app.controllers.db import add_api_key, delete_api_key, get_api_keys, get_cr
 router = APIRouter()
 
 
+@router.get("/ping")
+async def ping():
+    return {"result": True}
+
+
 
 @router.get('/api-keys')
 async def api_keys(request : Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
