@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from decouple import config
 import time
 from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
-
+import uuid
 
 JWT_ALGORITHM= None
 JWT_SECRET = None 
@@ -31,13 +31,14 @@ def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({"exp": expire})
-    # print(to_encode)
+    to_encode.update({"jti": str(uuid.uuid4())})
+
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
 
 
-def create_refresh_token(data):
+def create_refresh_token(data : dict):
     expires = timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
     return create_access_token(data=data, expires_delta=expires)
 
@@ -45,7 +46,7 @@ def create_refresh_token(data):
 def decodeJWT(token: str):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload if payload["exp"] > time.time() else None
+        return payload
     
     except Exception as e:
         print(e)
