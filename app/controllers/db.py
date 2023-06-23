@@ -4,6 +4,7 @@ import json
 import math
 import time
 from app.constants.exceptions import DATABASE_EXCEPTION
+from prisma.errors import UniqueViolationError
 from app.db.prisma import prisma
 from app.models.users import UserinDB
 from app.models.snippet import UpdateSnippet, CreateSnippet, UpdateSnippetName
@@ -201,12 +202,16 @@ async def get_user_by_id(id : int):
         raise DATABASE_EXCEPTION    
 
 
-async def add_blacklist_token(id : int):
+async def add_blacklist_token(token : str):
     try:
         await prisma.blacklist.create(
             data ={
-            "token": id,
+            "token": token,
         })
+
+    except UniqueViolationError as e:
+        print("Token already blacklisted")
+        return
 
     except Exception as e:
         print(e)
