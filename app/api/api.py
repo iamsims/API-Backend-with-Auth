@@ -87,11 +87,11 @@ async def delete_api_keys(request : Request, api_key: str, id_and_tokens:tuple =
         )
 
 @router.post("/api-keys/generate")
-async def create_api_key( name : str = None, id_and_tokens:tuple = Depends(get_current_user_id_http)):
+async def create_api_key( name : str = None, expiration_ts: int = None, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
         id, access_token, refresh_token = id_and_tokens
         api_key = generate_api_key()
-        await add_api_key( id, api_key, name)
+        await add_api_key( id, api_key, name, expiration_ts)
         response = JSONResponse(content={"result": True, "api_key": api_key}, status_code=200)
         if access_token and refresh_token:
             set_cookie(response, access_token, refresh_token)

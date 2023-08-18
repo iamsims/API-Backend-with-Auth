@@ -323,16 +323,17 @@ async def complete_log_entry(log_id, end_time, response_headers = None):
         print(e)
         raise DATABASE_EXCEPTION
     
-async def add_api_key( id : int, api_key : str, name : str = None):
+async def add_api_key( id : int, api_key : str, name : str = None, expiration_ts : int = None):
     try:
         created = math.floor(time.time()*1000) # in milliseconds
-        expiration_date = created + 60 * 60 * 24 * 30 * 1000 # in milliseconds
+        if expiration_ts:
+            expiration_ts = created + expiration_ts
 
         await prisma.api_keys.create(
             data={
             "key": api_key,
             "user_id": id,
-            "expiration_date": expiration_date,
+            "expiration_date": expiration_ts,
             "created": created,
             "name": name,
         })
