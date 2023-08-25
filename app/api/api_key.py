@@ -7,11 +7,11 @@ from starlette.responses import JSONResponse
 from fastapi import Request
 
 from decouple import config
-from app.auth.api_key import generate_api_key
-from app.auth.jwt_handler import set_cookie
+from app.controllers.auth.api_key import generate_api_key
+from app.controllers.auth.jwt_handler import set_cookie
 
 from app.constants.exceptions import  CREDENTIALS_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, DOESNT_EXIST_EXCEPTION, NOT_AUTHORIZED_EXCEPTION
-from app.api.authenticate import get_current_user_id_http
+from app.controllers.authenticate import get_current_user_id_http
 from app.controllers.db import add_api_key, delete_api_key, get_api_keys, get_credit_for_user, get_credit_purchase_history, get_logs, get_user_id_by_api_key
 
 router = APIRouter()
@@ -20,7 +20,6 @@ router = APIRouter()
 @router.get("/ping")
 async def ping():
     return {"result": True}
-
 
 
 @router.get('/api-keys')
@@ -182,10 +181,7 @@ async def get_credit_purchase(request:Request, id_and_tokens:tuple = Depends(get
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in getting user credit"
-        )
-    
-
-      
+        )  
 
 @router.get('/refresh-token')
 async def refresh(request:Request, id_tokens: tuple = Depends(get_current_user_id_http)):

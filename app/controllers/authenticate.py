@@ -3,7 +3,7 @@ from typing import Union
 from fastapi import Cookie
 
 from fastapi import Request
-from app.auth.jwt_handler import  decodeJWT, create_access_token, create_refresh_token
+from app.controllers.auth.jwt_handler import  decodeJWT, create_access_token, create_refresh_token
 from app.constants.exceptions import COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION
 from app.controllers.db import get_user_by_id, is_token_blacklisted
 
@@ -13,7 +13,6 @@ async def get_current_user_token(request:Request, access_token: Union[str, None]
         raise COOKIE_EXCEPTION
     _ = await get_current_user_id(access_token, refresh_token, refresh_tokens_generate=False)
     return access_token, refresh_token
-
 
 
 

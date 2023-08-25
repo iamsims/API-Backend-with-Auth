@@ -10,22 +10,22 @@ from fastapi import Request
 from starlette.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuthError
 from fastapi.security import OAuth2PasswordRequestForm
-from app.api.authenticate import get_current_user_id_http, get_current_user_token
-from app.auth.api_key import generate_api_key
+from app.controllers.authenticate import get_current_user_id_http, get_current_user_token
+from app.controllers.auth.api_key import generate_api_key
 
 
 
 from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_NOT_ENOUGH_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
 # from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
-from app.auth.jwt_handler import create_access_token, create_refresh_token, decodeJWT, set_cookie
-from app.auth.password_handler import get_password_hash, verify_password
+from app.controllers.auth.jwt_handler import create_access_token, create_refresh_token, decodeJWT, set_cookie
+from app.controllers.auth.password_handler import get_password_hash, verify_password
 from app.controllers.db import add_api_key, add_blacklist_token, add_user_identity, create_signup_credit_for_user, add_user, get_user, get_user_by_id, get_user_identity_by_provider, is_token_blacklisted
-from app.api.api import create_api_key
+from app.api.api_key import create_api_key
 
 from app.models.users import UserinDB
 
 from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
-from app.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
+from app.controllers.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
 
 
 
@@ -298,98 +298,3 @@ async def get_user_profile(request:Request, id_and_tokens:tuple = Depends(get_cu
         detail="Exception in getting user profile"
         )
     
-
-
-
-
-# @router.get("/testall")
-# async def testall():
-#     return await get_all_api_keys()
-
-# @router.get("/usersall")
-# async def testall():
-#     return await get_all_users()
-
-
-
-# # @router.route('/kuber/{endpoint:path}'])
-# # if authenticated, requests forwarded to the kuber server
-# # @router.get('/kuber/{endpoint:path}')
-# # async def forward(request: Request, identifier: str = Depends(get_current_user)):
-# #     try:
-# #         endpoint = request.path_params['endpoint']
-# #         print(f"Forwarding get request to {KUBER_SERVER}/{endpoint}")
-        
-# #         # async with httpx.AsyncClient() as client:
-# #         #     response = await client.get(f"http://localhost:8000/{endpoint}", headers=request.headers)
-# #         #     return JSONResponse(content=response.json(), status_code=response.status_code)
-# #         print(identifier)
-# #         return JSONResponse(content={"result": True, "identifier": identifier}, status_code=200 )
-        
-# #      except Exception as e:
-        # print(e)
-# #         print("Could not forward request")
-# #         raise KUBER_EXCEPTION
-    
-
-# # @router.post('/kuber/{endpoint:path}')
-# # async def forward(request: Request, identifier: str = Depends(get_current_user)):
-# #     try:
-# #         endpoint = request.path_params['endpoint']
-# #         print(f"Forwarding post request to {KUBER_SERVER}/{endpoint}")
-# #         # async with httpx.AsyncClient() as client:
-# #             # response = await client.post(f"http://localhost:8000/{endpoint}", headers=request.headers, data=request.body)
-# #             # return JSONResponse(content=response.json(), status_code=response.status_code)
-# #         return JSONResponse(content={"result": True}, status_code=200)
-
-# #      except Exception as e:
-        # print(e)
-# #         print("Could not forward request")
-# #         raise KUBER_EXCEPTION
-  
-
-
-
-
-
-# # Implementation of refresh token
-# # @router.post('/refresh')
-# # async def refresh(request: Request):
-# #     try:
-# #         form = await request.json()
-# #         if form.get('grant_type') == 'refresh_token':
-# #             token = form.get('refresh_token')
-# #             payload = decodeJWT(token)
-# #             email = payload.get('email')
-# #             if valid_email_from_db(email):
-# #                 return JSONResponse({'result': True, 'access_token': create_access_token(data={"email": email})})
-            
-# #             else :
-# #                 print("Email not found in db")
-
-# #     except JWTError:
-# #         print("JWTError")
-# #         raise CREDENTIALS_EXCEPTION
-# #     raise CREDENTIALS_EXCEPTION
-
-
-
-# # async def get_current_user_id_httpentifier(data : UserinDB = Depends(get_current_user_id_http)):
-# #     return data.identifier
-  
-
-# # Comment out the following lines to test users in db
-
-# # async def add_if_not_in_db(data: UserinDB ):
-# #     user_exists  = await users_exists_by_data(data)
-# #     if not user_exists:
-# #         print("Adding user")
-# #         await add_user(data)
-
-
-
-# # @router.get("/test")
-# # async def test():
-# #     data = UserinDB(identifier="tassu", provider="password")
-# #     await add_if_not_in_db(data)
-

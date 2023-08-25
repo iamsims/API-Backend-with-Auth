@@ -1,8 +1,8 @@
 import subprocess
 import sys, os
 from fastapi import FastAPI
-from app.api.users_api import router as users_router
-from app.api.api import router as api_router
+from app.api.auth import router as users_router
+from app.api.api_key import router as api_router
 from app.api.ws_proxy import router as ws_proxy_router
 from app.api.snippet import router as snippet_router
 
