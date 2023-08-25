@@ -3,8 +3,6 @@ import sys, os
 from fastapi import FastAPI
 from app.api.auth import router as users_router
 from app.api.api_key import router as api_router
-from app.api.ws_proxy import router as ws_proxy_router
-from app.api.snippet import router as snippet_router
 
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
@@ -40,9 +38,6 @@ app.add_middleware(
 
 app.include_router(users_router, prefix= "/auth")
 app.include_router(api_router, prefix = "/api/v1")
-app.include_router(snippet_router, prefix= "/snippet")
-app.include_router(ws_proxy_router)
-
 
 @app.on_event('startup')
 async def startup_event():
