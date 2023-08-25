@@ -4,17 +4,16 @@ python3 -m venv fastapienv
 source fastapienv/bin/activate 
 pip install -r requirements.txt 
 prisma generate # generates from schema.prisma
-uvicorn main:app --reload
+
 ```
 
+# Configuration 
+Setup a .env file with the variables from .env.example
 
-
-
-# Data Migration
-
-Create
+# Run
 ```bash
-prisma migrate dev --name `name` --create-only #requires DB_URL be set in the environment, performed during development 
+uvicorn main:app --reload --port 8000
 ```
 
-Sync is performed by the code, during startup, using db config from secret file. 
+# Swagger UI
+http://localhost:8000/docs
