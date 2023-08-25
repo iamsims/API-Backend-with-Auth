@@ -27,5 +27,10 @@ archive.zip
 .*.sw?
 fastapienv
 .env 
-.secrets
-
+.gitlab-ci.yml
+README.md
+.env.example
+.gitignore
+.git
+Dockerfile
+.dockerignore
