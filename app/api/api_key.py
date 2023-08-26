@@ -1,18 +1,17 @@
 import math
 import time
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status 
+from fastapi import APIRouter, Depends, HTTPException, status 
 
 from urllib.parse import quote
 from starlette.responses import JSONResponse
 from fastapi import Request
 
-from decouple import config
 from app.controllers.auth.api_key import generate_api_key
 from app.controllers.auth.jwt_handler import set_cookie
 
-from app.constants.exceptions import  CREDENTIALS_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, DOESNT_EXIST_EXCEPTION, NOT_AUTHORIZED_EXCEPTION
+from app.constants.exceptions import DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, DOESNT_EXIST_EXCEPTION, NOT_AUTHORIZED_EXCEPTION
 from app.controllers.authenticate import get_current_user_id_http
-from app.controllers.db import add_api_key, delete_api_key, get_api_keys, get_credit_for_user, get_credit_purchase_history, get_logs, get_user_id_by_api_key
+from app.controllers.db import add_api_key, delete_api_key, get_api_keys, get_credit_for_user, get_credit_purchase_history, get_user_id_by_api_key
 
 router = APIRouter()
 
@@ -136,31 +135,6 @@ async def get_credit(request : Request, id_and_tokens:tuple = Depends(get_curren
         )
 
 
-@router.get("/credit/usage")
-async def get_credit_usage(request : Request, api_key : str = None, page: int = 1, page_size: int = 10, id_and_tokens:tuple = Depends(get_current_user_id_http)):
-    try:
-        id, access_token, refresh_token = id_and_tokens
-        paginated_logs = await get_logs( id , api_key, page, page_size)
-        paginated_logs["logs"] = [dict(log) for log in paginated_logs["logs"]]
-        response = JSONResponse(content=paginated_logs, status_code=200)
-
-        if access_token and refresh_token:
-            set_cookie(response, access_token, refresh_token)
-
-        return response
-        
-    
-    except DATABASE_EXCEPTION :
-        raise DATABASE_EXCEPTION
-    
-    except Exception as e:
-        print(e)
-        raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Exception in getting user credit"
-        )
-    
-
 @router.get("/credit/purchases")
 async def get_credit_purchase(request:Request, id_and_tokens:tuple = Depends(get_current_user_id_http)):
     try:
@@ -182,4 +156,4 @@ async def get_credit_purchase(request:Request, id_and_tokens:tuple = Depends(get
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Exception in getting user credit"
         )  
-
+    

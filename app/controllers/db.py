@@ -10,65 +10,6 @@ from app.models.users import UserinDB
 from app.models.snippet import UpdateSnippet, CreateSnippet, UpdateSnippetName
 
 
-
-async def get_snippet(snippet_id):
-    try:
-        snippet = await prisma.snippet.find_unique(
-            where={"id": snippet_id}
-        )
-        return snippet
-    
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-    
-
-async def create_snippet(snippet: CreateSnippet, snippet_id : str, user_id: int) -> int:
-    try:
-        db_snippet = await prisma.snippet.create(
-            {"id" : snippet_id, "code": snippet.code, "user_id": user_id, "lang": snippet.lang, "name": snippet.name}
-        )
-        return db_snippet.id
-        
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
- 
-
-async def update_snippet(snippet_id: str, snippet: UpdateSnippet) :
-    try:
-        return await prisma.snippet.update(
-        where={"id": snippet_id},
-        data={"code": snippet.code},
-        )
-        
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-
-
-async def update_snippet_name(snippet_id: int, snippet: UpdateSnippetName) :
-    try:
-        return await prisma.snippet.update(
-        where={"id": snippet_id},
-        data={"name": snippet.name},
-        )
-        
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-
-
-async def delete_snippet(snippet_id: str):
-    try:
-        await prisma.snippet.delete(where={"id": snippet_id})
-        return 
-        
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-
-
 async def get_user( data: UserinDB):
     try:
         if data.provider == "password":
@@ -256,73 +197,8 @@ async def get_user_id_by_api_key(api_key : str):
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION
-
-async def add_log_entry(start_time, user_id, ip_address, end_time = None, request_headers = None, cost = 0, api_key = None, endpoint = None, method = None, status_code = None,  response_headers = None):
-    try:
-        if request_headers is None:
-            request_headers = {}
-
-        if response_headers is None:
-            response_headers = {}
-
-        log = await prisma.logs.create(
-            data={
-            "start_time": start_time,
-            "end_time": end_time,
-            "ip_address": ip_address,
-            "cost": cost,
-            "user_id": user_id,
-            "api_key": api_key,
-            "endpoint": endpoint,
-            "method": method,
-            "status_code": status_code,
-            "request_headers": json.dumps(dict(request_headers)),
-            "response_headers": json.dumps(dict(response_headers))
-
-        })
-        # 
-        return log.id
-     
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-    
-async def increment_cost_for_log_entry(log_id, cost):
-    try:
-        await prisma.logs.update(
-            where={
-                "id": log_id,
-            },
-            data={
-                "cost": {
-                "increment": cost
-                }
-            }
-        )
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-
-async def complete_log_entry(log_id, end_time, response_headers = None):
-    try:
-        if response_headers is None:
-            response_headers = {}
-
-        log = await prisma.logs.update(
-            where={
-                "id": log_id,
-            },
-            data={
-                "end_time": end_time,
-                "response_headers": json.dumps(dict(response_headers))
-            }
-        )
-
-
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION
-    
+ 
+  
 async def add_api_key( id : int, api_key : str, name : str = None, expiration_ts : int = None):
     try:
         created = math.floor(time.time()*1000) # in milliseconds
@@ -354,64 +230,6 @@ async def delete_api_key(api_key : str):
     except Exception as e:
         print(e)
         raise DATABASE_EXCEPTION
-
-
-
-async def get_logs(user_id: str, api_key : str =None, page: int = 1, page_size: int = 10):
-    try:
-        if not api_key:
-            logs = await prisma.logs.find_many(
-                where={
-                    "user_id": user_id,
-                },
-                skip=(page - 1) * page_size,
-                take=page_size,
-                order={
-                    "start_time": "desc"
-                }
-            )
-            count = await prisma.logs.count(
-                where={
-                    "user_id": user_id,
-                }
-            )
-        else:
-            logs = await prisma.logs.find_many(
-                where={
-                    "user_id": user_id,
-                    "api_key": api_key,
-                },
-                skip=(page - 1) * page_size,
-                take=page_size,
-                order={
-                    "end_time": "desc"
-
-                }
-            )
-            count = await prisma.logs.count(
-                where={
-                    "user_id": user_id,
-                    "api_key": api_key,
-                }
-            )
-       
-        result = []
-        for log in logs:
-            log.request_headers = None
-            log.response_headers = None
-            result.append(log)
-        
-        total_size = math.ceil(count / page_size)
-        return {
-            "logs": result,       
-            "total_pages": total_size, 
-            "page": page,
-            "page_size": page_size
-        }
-            
-    except Exception as e:
-        print(e)
-        raise DATABASE_EXCEPTION    
 
 
 async def get_credit_for_user(id : int):
