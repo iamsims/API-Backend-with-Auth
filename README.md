@@ -1,11 +1,10 @@
-# Snippet Sharing API Backend 
+# Auth API Backend 
 
-Welcome to the Snippet Sharing project. This is a CRUD API backend with authentication implemented using FastAPI and Prisma ORM. If you're an authenticated user, you can share code snippets, edit them, and manage them. For developers and other services, there's a generated API key associated with each user to provide easy integration with other microservices.
+Welcome to the Auth API Backend Project. This is a CRUD API backend with authentication implemented using FastAPI and Prisma ORM. It provides authentication with google, github and password. For developers and other services, there's a generated API key associated with each user to provide easy integration with other microservices.
 
 ## Features:
 
 - User registration and authentication.
-- CRUD operations for code snippets.
 - API key generation for users.
 - Integration capabilities with other microservices.
 
