@@ -1,8 +1,5 @@
-import datetime
-import secrets
 import traceback
-from typing import Union
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, WebSocket, status 
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status 
 
 from urllib.parse import quote, urlparse
 from starlette.responses import JSONResponse
@@ -15,16 +12,13 @@ from app.controllers.auth.api_key import generate_api_key
 
 
 
-from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, CREDIT_NOT_ENOUGH_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, ENDPOINT_DOES_NOT_EXIST_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, KUBER_EXCEPTION, PROVIDER_EXCEPTION
-# from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, COOKIE_EXCEPTION, CREDENTIALS_EXCEPTION, DATABASE_EXCEPTION, GITHUB_OAUTH_EXCEPTION, GOOGLE_OAUTH_EXCEPTION, INCORRENT_PASSWORD_EXCEPTION, INCORRENT_USERNAME_EXCEPTION, KUBER_EXCEPTION, LOGIN_EXCEPTION, PROVIDER_EXCEPTION, SIGNUP_EXCEPTION, CustomException
-from app.controllers.auth.jwt_handler import create_access_token, create_refresh_token, decodeJWT, set_cookie
+from app.constants.exceptions import ALREADY_REGISTERED_EXCEPTION, DATABASE_DOWN_EXCEPTION, DATABASE_EXCEPTION, INCORRECT_PASSWORD_EXCEPTION, INCORRECT_USERNAME_EXCEPTION, PROVIDER_EXCEPTION
+from app.controllers.auth.jwt_handler import create_access_token, create_refresh_token, set_cookie
 from app.controllers.auth.password_handler import get_password_hash, verify_password
 from app.controllers.db import add_api_key, add_blacklist_token, add_user_identity, create_signup_credit_for_user, add_user, get_user, get_user_by_id, get_user_identity_by_provider, is_token_blacklisted
-from app.api.api_key import create_api_key
 
 from app.models.users import UserinDB
 
-from app.constants.token import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES
 from app.controllers.auth.oauth import get_github_token, get_google_token, get_user_info_github, oauth, GITHUB_CLIENT_ID
 
 
@@ -298,3 +292,30 @@ async def get_user_profile(request:Request, id_and_tokens:tuple = Depends(get_cu
         detail="Exception in getting user profile"
         )
     
+
+@router.get('/refresh-token')
+async def refresh(request:Request, id_tokens: tuple = Depends(get_current_user_id_http)):
+    try:
+        _, access_token, refresh_token = id_tokens
+        response = JSONResponse(content={"result": True}, status_code=200)
+        if refresh_token and access_token:
+            set_cookie(response, access_token, refresh_token)
+            print("Refreshed token")
+        else:
+            print("Refresh not required")
+
+        return response
+    
+    except DATABASE_EXCEPTION:
+        raise DATABASE_EXCEPTION
+    
+    except DATABASE_DOWN_EXCEPTION:
+      raise DATABASE_DOWN_EXCEPTION
+    
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Exception in refreshing token"
+        )
+
