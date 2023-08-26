@@ -7,6 +7,7 @@ from app.api.api_key import router as api_router
 from starlette.middleware.sessions import SessionMiddleware
 from decouple import config
 from fastapi.middleware.cors import CORSMiddleware
+from app.controllers.exception_handler import install_exception_handlers
 
 from app.db.prisma import prisma
 
@@ -27,6 +28,9 @@ except:
 
 
 app = FastAPI()
+
+install_exception_handlers(app)
+
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 app.add_middleware(
     CORSMiddleware,

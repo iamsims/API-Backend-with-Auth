@@ -1,12 +1,12 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Request
+from starlette.responses import JSONResponse
+
 
 class PROVIDER_EXCEPTION(HTTPException):
     def __init__(self):
         self.status_code = status.HTTP_400_BAD_REQUEST
         self.detail = "Invalid provider"
         super().__init__(status_code=self.status_code, detail=self.detail)
-
-
 
 class CREDENTIALS_EXCEPTION(HTTPException):
     def __init__(self):
@@ -39,7 +39,6 @@ class LOGIN_EXCEPTION(HTTPException):
         super().__init__(status_code=self.status_code, detail=self.detail)
 
 
-
 class COOKIE_EXCEPTION(HTTPException):
     def __init__(self):
         self.status_code = status.HTTP_401_UNAUTHORIZED
@@ -60,19 +59,11 @@ class CREDIT_NOT_ENOUGH_EXCEPTION(HTTPException):
         self.detail = "You don't have enough credit to perform this request"
         super().__init__(status_code=self.status_code, detail=self.detail)
 
-class TOO_MANY_SESSIONS_EXCEPTION(HTTPException):
-    def __init__(self):
-        self.status_code = status.HTTP_400_BAD_REQUEST
-        self.detail = "TOO MANY SESSIONS IN THE SERVER"
-        super().__init__(status_code=self.status_code, detail=self.detail)
-
-
 class ALREADY_REGISTERED_EXCEPTION(HTTPException):
     def __init__(self):
         self.status_code = status.HTTP_400_BAD_REQUEST
         self.detail = "Username already registered"
         super().__init__(status_code=self.status_code, detail=self.detail)
-
 
 
 class DATABASE_EXCEPTION(HTTPException):
@@ -86,14 +77,6 @@ class DATABASE_DOWN_EXCEPTION(HTTPException):
     def __init__(self):
         self.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         self.detail = "DB server is down"
-        super().__init__(status_code=self.status_code, detail=self.detail)
-
-
-
-class KUBER_EXCEPTION(HTTPException):
-    def __init__(self):
-        self.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        self.detail = "Kuber error"
         super().__init__(status_code=self.status_code, detail=self.detail)
 
 class INCORRECT_USERNAME_EXCEPTION(HTTPException):

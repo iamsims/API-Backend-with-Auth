@@ -7,7 +7,6 @@ from app.constants.exceptions import DATABASE_EXCEPTION
 from prisma.errors import UniqueViolationError
 from app.db.prisma import prisma
 from app.models.users import UserinDB
-from app.models.snippet import UpdateSnippet, CreateSnippet, UpdateSnippetName
 
 
 async def get_user( data: UserinDB):
